@@ -24,30 +24,6 @@
         ("true", TRUE);
         ("false", FALSE)
     ]
-
-let string_of_token = function
-  | PLUS   -> "PLUS"
-  | IF     -> "IF"
-  | INT    -> "int"
-  | ID(s)  -> Printf.sprintf "ID(%s)" s
-  | LINT(i) -> Printf.sprintf "NUM(%d)" i
-  | LCHAR(c) -> Printf.sprintf "CHAR(%c)" c
-  | LPAREN  -> "("
-  | RPAREN -> ")"
-  | LBRACE  -> "{"
-  | RBRACE -> "}"
-  | SEMI -> ";"
-  | COMMA -> ","
-  | RETURN -> "return"
-  | WHILE -> "while"
-  | EOF    -> "eof"
-
-let rec iterate scanner =
-    match scanner () with
-    | EOF -> ()
-    | tok -> Printf.printf "%s\n" (string_of_token tok); 
-                    iterate scanner
-
 }(*header*)
 
 (*definitions*)
@@ -104,8 +80,3 @@ and multi_comment = parse
     |'\n'                    { Lexing.new_line lexbuf; multi_comment lexbuf }  
     |eof                     {EOF}
     |_                       { multi_comment lexbuf}
-{
-let lexbuf = Lexing.from_channel stdin in
-    iterate (fun () -> token lexbuf)
-
-}(*trailer*)
