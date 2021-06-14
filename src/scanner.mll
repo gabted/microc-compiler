@@ -92,15 +92,19 @@ rule token = parse
     | ']'                    { RBRACKET }
     | ','                    {COMMA}
     | ';'                    { SEMI }
+    | eof                    { EOF }
     | [' ' '\t']             { token lexbuf }
     | '\n'                   { Lexing.new_line lexbuf; token lexbuf }
-    | eof                    { EOF }
+    | "//"[^ '\n']*'\n'       { Lexing.new_line lexbuf; token lexbuf }
+    | "/*"                   {multi_comment lexbuf;}
     | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ Char.escaped c) }
 
+and multi_comment = parse
+    "*/"                     { token lexbuf }
+    |'\n'                    { Lexing.new_line lexbuf; multi_comment lexbuf }  
+    |eof                     {EOF}
+    |_                       { multi_comment lexbuf}
 {
-
-
-
 let lexbuf = Lexing.from_channel stdin in
     iterate (fun () -> token lexbuf)
 

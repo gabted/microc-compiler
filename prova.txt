@@ -2,9 +2,10 @@ int add(int x, int y)
 {
   return x + y;
 }
-
+//questo è un commento singola linea
 int main()
 {
-  print( add(17, 25) );
+  print( add(17, 25) );/*questo è
+  un commento multilina/*
   return 0;
 }
