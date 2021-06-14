@@ -6,7 +6,7 @@
     open Ast
 
     (* Define here your utility functions *)
-    let (@@) node loc = {loc = loc; node = node}
+    let (@@) node loc = {loc = loc; node = node; id = 0}
 
 %}//header
 
@@ -39,17 +39,28 @@
 %%
 /* Grammar specification */
 
-typ:
-  | INT          { TypI     }
-  | BOOL         { TypB     }
-  | CHAR         { TypC     }
-  | VOID         { TypV     }
   
 program:
   |  l=topDecl* EOF                      {Prog(l)}
 
 topDecl:
-  | d=varDecl SEMI { (Vardec )@@ $loc}
+  | d=funDecl                {Fundecl d @@ $loc}
+  | d=varDecl SEMI             {Vardec (fst d, snd d) @@ $loc}
 
-/*%%*/
-/* Trailer */
+varDecl:
+  |t=typ id=ID {(t, id)}
+
+funDecl:
+  |t=typ id=ID LPAREN p=separated_list(COMMA, varDecl) RPAREN
+                  {
+                    {typ=t; fname=id; formals=p; body = Return None @@ dummy_pos}
+                  }
+
+typ:
+  | INT          { TypI     }
+  | BOOL         { TypB     }
+  | CHAR         { TypC     }
+  | VOID         { TypV     }
+
+/*%%
+ Trailer */

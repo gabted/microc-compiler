@@ -1,0 +1,5 @@
+int x;
+int y;
+bool guardia;
+
+int fact (int n, bool b)
