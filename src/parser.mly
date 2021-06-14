@@ -6,7 +6,7 @@
     open Ast
 
     (* Define here your utility functions *)
-
+    let (@@) node loc = {loc = loc; node = node}
 
 %}//header
 
@@ -39,9 +39,17 @@
 %%
 /* Grammar specification */
 
+typ:
+  | INT          { TypI     }
+  | BOOL         { TypB     }
+  | CHAR         { TypC     }
+  | VOID         { TypV     }
+  
 program:
-  |  EOF                      {Prog([])}
-;
+  |  l=topDecl* EOF                      {Prog(l)}
+
+topDecl:
+  | d=varDecl SEMI { (Vardec )@@ $loc}
 
 /*%%*/
 /* Trailer */
