@@ -24,11 +24,37 @@
         ("true", TRUE);
         ("false", FALSE)
     ]
-}
-    let digit = ['0' - '9']
-    let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' '0'-'9']*
 
+let string_of_token = function
+  | PLUS   -> "PLUS"
+  | IF     -> "IF"
+  | INT    -> "int"
+  | ID(s)  -> Printf.sprintf "ID(%s)" s
+  | LINT(i) -> Printf.sprintf "NUM(%d)" i
+  | LCHAR(c) -> Printf.sprintf "CHAR(%c)" c
+  | LPAREN  -> "("
+  | RPAREN -> ")"
+  | LBRACE  -> "{"
+  | RBRACE -> "}"
+  | SEMI -> ";"
+  | COMMA -> ","
+  | RETURN -> "return"
+  | WHILE -> "while"
+  | EOF    -> "eof"
 
+let rec iterate scanner =
+    match scanner () with
+    | EOF -> ()
+    | tok -> Printf.printf "%s\n" (string_of_token tok); 
+                    iterate scanner
+
+}(*header*)
+
+(*definitions*)
+let digit = ['0' - '9']
+let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' '0'-'9']*
+
+(*rules*)
 rule token = parse
     digit+ as inum         { let num = int_of_string inum in
                                 LINT(num)
@@ -42,13 +68,14 @@ rule token = parse
                             with Not_found ->
                                 ID(word)
                             }
+    | '&'                    { DEREF }
     | '+'                    { PLUS }
     | '-'                    { MINUS }
     | '*'                    { TIMES }
     | '/'                    { DIV }
     | '%'                    { REMINDER }
-    | '='                    { EQ }
-    | "=="                   { DEQ }
+    | '='                    { ASSIGN }
+    | "=="                   { EQ }
     | "!="                    { NEQ }
     | '<'                    { LESS }
     | "<="                   { LEQ }
@@ -63,7 +90,18 @@ rule token = parse
     | '}'                    { RBRACE }
     | '['                    { LBRACKET }
     | ']'                    { RBRACKET }
+    | ','                    {COMMA}
+    | ';'                    { SEMI }
     | [' ' '\t']             { token lexbuf }
     | '\n'                   { Lexing.new_line lexbuf; token lexbuf }
     | eof                    { EOF }
     | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ Char.escaped c) }
+
+{
+
+
+
+let lexbuf = Lexing.from_channel stdin in
+    iterate (fun () -> token lexbuf)
+
+}(*trailer*)
