@@ -44,7 +44,7 @@ rule token = parse
                             with Not_found ->
                                 ID(word)
                             }
-    | '&'                    { DEREF }
+    | '&'                    { REF }
     | '+'                    { PLUS }
     | '-'                    { MINUS }
     | '*'                    { TIMES }

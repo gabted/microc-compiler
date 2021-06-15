@@ -21,13 +21,28 @@
       let {loc=p2; node=s2; id=_} = _s2 in
       let list = [Stmt _s1 @@ p1; Stmt _s2 @@ p2] in
       Block list @@ (fst p1, snd p2)
+    
+    let skip = Block [] @@ dummy_pos
 
+    type descType = 
+      | Id of string 
+      | Pointer of descType
+      | Array of descType * (int option)
+    
+    let rec buildType t = function 
+      |Id s            -> (t, s) 
+      | Pointer d      -> let t1, s = buildType t d in
+                              (TypP t1, s)
+      | Array(d, n) -> let t1, s = buildType t d in
+                              (TypA(t1, n), s)
+
+  (*int **var -> (TypP(TypP int),var)*)
 %}//header
 
 /* Tokens declarations */
 %token IF RETURN ELSE FOR WHILE INT CHAR VOID NULL BOOL
 %token TRUE FALSE
-%token DEREF PLUS MINUS TIMES DIV REMINDER ASSIGN 
+%token REF PLUS MINUS TIMES DIV REMINDER ASSIGN 
 %token EQ NEQ LESS LEQ GREATER GEQ AND OR NOT
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET COMMA SEMI
 %token <string>ID
@@ -36,14 +51,16 @@
 %token EOF
 
 /* Precedence and associativity specification */
-%right   EQ
+%nonassoc SHORTIF
+%nonassoc ELSE
+%right   ASSIGN
 %left    OR
 %left    AND
-%left    DEQ NEQ
+%left    EQ NEQ
 %nonassoc GREATER LESS LEQ GEQ
 %left PLUS MINUS
 %left TIMES DIV REMINDER
-%nonassoc  NOT DEREF
+%nonassoc  NOT REF
 %nonassoc  LBRACKET
 
 /* Starting symbol */
@@ -62,7 +79,14 @@ topDecl:
   | d=funDecl                  {Fundecl d @@ $loc}
 
 varDecl:
-  |t=typ id=ID {(t, id)}
+  |t=typ d=varDesc { buildType t d}
+
+varDesc:
+  |id=ID  {Id id}
+  |TIMES d=varDesc  {Pointer d}
+  |LPAREN d=varDesc RPAREN {d}
+  |d=varDesc LBRACKET RBRACKET {Array(d, None)}
+  |d=varDesc LBRACKET n=LINT RBRACKET {Array(d, Some n)}
 
 funDecl:
   |t=typ id=ID LPAREN p=separated_list(COMMA, varDecl) RPAREN b=block
@@ -94,12 +118,56 @@ statement:
               in
               if Option.is_none e1 then
                   whileStmt
-              else join_stmts (Expr(Option.get e1) @@ $loc(e1)) whileStmt
+              else 
+                join_stmts (Expr(Option.get e1) @@ $loc(e1)) whileStmt
             }
-  | IF LPAREN e=expr RPAREN s=statement {If(e, s, s) @@ $loc}
+  | IF LPAREN e=expr RPAREN s1=statement ELSE s2=statement
+        {If(e, s1, s2) @@ $loc}
+  | IF LPAREN e=expr RPAREN s=statement %prec SHORTIF {If(e, s, skip) @@ $loc}
 
 expr:
-  |n=LINT     {ILiteral n  @@ $loc}
+  |e=lExpr  {Access e @@ $loc}
+  |e=rExpr  {e}
+
+lExpr:
+  |id=ID       {AccVar id @@ $loc}
+  |LPAREN e=lExpr RPAREN {e}
+  |TIMES e=aExpr  {AccDeref e @@ $loc}
+  |TIMES e=lExpr  {AccDeref(Access e @@ $loc) @@ $loc}
+  |e=lExpr LBRACKET i=expr RBRACKET
+        {AccIndex(e, i) @@ $loc}
+
+rExpr:
+  |e=aExpr  {e}
+  |id=ID LPAREN l=separated_list(COMMA, expr) RPAREN 
+    {Call(id, l) @@ $loc}
+  |le=lExpr ASSIGN v=expr {Assign(le, v) @@ $loc}
+  |NOT e=expr {UnaryOp(Not, e) @@ $loc}
+  |MINUS e=expr {UnaryOp(Neg, e) @@ $loc}
+  |e1=expr op=bin e2=expr {BinaryOp(op, e1, e2) @@ $loc}
+%inline bin:
+  |PLUS         {Add}
+  |MINUS        {Sub} 
+  |TIMES        {Mult}
+  |DIV          {Div}
+  |REMINDER     {Mod}
+  |AND          {And}
+  |OR           {Or}
+  |LESS         {Less}
+  |GREATER      {Greater}
+  |LEQ          {Leq}
+  |GEQ          {Geq}
+  |EQ           {Equal}
+  |NEQ          {Neq}
+
+aExpr:
+  |n=LINT     {ILiteral n @@ $loc}
+  |c=LCHAR    {CLiteral c @@ $loc}
+  |TRUE       {BLiteral true @@ $loc}
+  |FALSE      {BLiteral false @@ $loc}
+  |NULL       {ILiteral 0 @@ $loc}
+  |LPAREN e=rExpr RPAREN {e}
+  |REF e=lExpr {Addr e @@ $loc}
 
 typ:
   | INT          { TypI     }
