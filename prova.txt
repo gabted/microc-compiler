@@ -2,4 +2,8 @@ int x;
 int y;
 bool guardia;
 
-int fact (int n, bool b)
+int fact (int n, bool b){
+    int x;
+    for(; 5;7)
+        return;
+}
