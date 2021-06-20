@@ -1,9 +1,7 @@
-module I =
-  Parser.MenhirInterpreter
-
+open Util
 
 let parse lexbuf =
-  let supplier = I.lexer_lexbuf_to_supplier Scanner.token lexbuf in
-  let start = Parser.Incremental.program lexbuf.lex_curr_p in
-  I.loop supplier start
-
+  try
+    Parser.program Scanner.token lexbuf
+  with
+    Parser.Error -> raise_syntax_error lexbuf ("Syntax Error on lexeme:"^ Lexing.lexeme lexbuf)

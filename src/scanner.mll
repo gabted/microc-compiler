@@ -32,8 +32,10 @@ let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' '0'-'9']*
 
 (*rules*)
 rule token = parse
-    digit+ as inum         { let num = int_of_string inum in
-                                LINT(num)
+    digit+ as inum         { let _num = int_of_string_opt inum in
+                                match _num with
+                                |Some(num) -> LINT(num)
+                                |None -> Util.raise_lexer_error lexbuf (Lexing.lexeme lexbuf ^": Invalid int format")
                             }
     |'\''['a'-'z' 'A'-'Z' '0' - '9']'\'' as s   
                              {let c = s.[1] in
