@@ -2,7 +2,6 @@
 // Code adapted from https://www.geeksforgeeks.org/array-rotation/
 /* Function to left Rotate arr[] of size n by 1*/
 
-
 void leftRotatebyOne(int arr[], int n) 
 { 
     int temp;

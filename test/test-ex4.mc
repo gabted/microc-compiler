@@ -2,21 +2,6 @@
 
 int a[20];			/* Must be global */
 
-void main() { 
-  int i; 
-  i = 0; 
-  int f; 
-  f = 1;
-  int n;
-  n = 5;
-  while (i < n) {
-    a[i] = f;
-    i = i + 1;
-    f = f * i;
-  }
-  printarr(n, a);
-}
-
 void printarr(int len, int a[]) {
   int i; 
   i = 0; 
@@ -25,3 +10,18 @@ void printarr(int len, int a[]) {
     i=i+1; 
   } 
 }
+
+void main(int n) { 
+  int i; 
+  i = 0; 
+  int f; 
+  f = 1;
+  while (i < n) {
+    a[i] = f;
+    i = i + 1;
+    f = f * i;
+  }
+  printarr(n, a);
+}
+
+
