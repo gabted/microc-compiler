@@ -1,14 +1,23 @@
 exception DuplicateEntry
 
-type 'a t = int (* TODO: this is a dummy definition *)
+module MyMap = Map.Make(String)
 
-let empty_table = failwith "Not implemented yet"
+type 'a t = 'a MyMap.t list
 
-let begin_block table = failwith "Not implemented yet"
+let empty_table = [MyMap.empty]
 
-let end_block table = failwith "Not implemented yet"
+let begin_block table = MyMap.empty :: table
 
-let add_entry symbol info table = failwith "Not implemented yet"
+let end_block = function
+|[] -> failwith "Illegal Symbol_table state: More blocks ended then opened"
+|m::ms -> ms
 
-let rec lookup symbol table = failwith "Not implemented yet"
+let add_entry symbol data = function
+  |[] -> failwith "Illegal Symbol_table state: More blocks ended then opened"
+  |m::ms -> (MyMap.add symbol data m)::ms
 
+let rec lookup symbol = function
+|[] -> None
+|m::ms ->  let d = MyMap.find_opt symbol m in
+            if Option.is_some d then d
+            else lookup symbol ms

@@ -1,6 +1,0 @@
-int x;
-
-int f(){
-    int y;
-    y = 15;
-}

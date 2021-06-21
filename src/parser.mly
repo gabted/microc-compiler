@@ -5,9 +5,9 @@
 %{
     open Ast
 
-    (* Define here your utility functions *)
-    
-    let (@@) node loc = {loc = loc; node = node; id = 0}
+    let counter = ref(0)     (* counter to generated unique labels *)
+    let next_label () = incr counter; !counter   
+    let (@@) node loc = {loc = loc; node = node; id = next_label ()}
 
     (*
     Given two annotated statements s1, s2,

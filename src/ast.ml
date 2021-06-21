@@ -11,6 +11,9 @@ let dummy_pos = (Lexing.dummy_pos, Lexing.dummy_pos)
 
 type 'a annotated_node = {loc : position[@opaque]; node : 'a; id : int }[@@deriving show]
 
+let getNode = function
+  |{loc=_; node=n; id=_} -> n
+
 type typ =
   | TypI                             (* Type int                    *)
   | TypB                             (* Type bool                   *)
