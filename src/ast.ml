@@ -9,10 +9,11 @@ type identifier = string [@@deriving show]
 type position = Lexing.position * Lexing.position 
 let dummy_pos = (Lexing.dummy_pos, Lexing.dummy_pos) 
 
-type 'a annotated_node = {loc : position[@opaque]; node : 'a; id : int }[@@deriving show]
+type 'a annotated_node = {loc : position[@opaque]; node : 'a; }[@@deriving show]
+let (@@) node loc = {loc = loc; node = node;} 
 
-let getNode = function
-  |{loc=_; node=n; id=_} -> n
+(*let getNode = function
+  |{loc=_; node=n; } -> n*)
 
 type typ =
   | TypI                             (* Type int                    *)

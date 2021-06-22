@@ -5,10 +5,6 @@
 %{
     open Ast
 
-    let counter = ref(0)     (* counter to generated unique labels *)
-    let next_label () = incr counter; !counter   
-    let (@@) node loc = {loc = loc; node = node; id = next_label ()}
-
     (*
     Given two annotated statements s1, s2,
      build a an annotated block, conceptually equivalent to
@@ -17,8 +13,8 @@
      the endPos of s2.
      *)
     let join_stmts _s1 _s2 = 
-      let {loc=p1; node=s1; id=_} = _s1 in
-      let {loc=p2; node=s2; id=_} = _s2 in
+      let {loc=p1; node=s1; } = _s1 in
+      let {loc=p2; node=s2; } = _s2 in
       let list = [Stmt _s1 @@ p1; Stmt _s2 @@ p2] in
       Block list @@ (fst p1, snd p2)
     
