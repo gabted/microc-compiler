@@ -1,5 +1,5 @@
 type binop = Add | Sub | Mult | Div  | Mod | Equal | Neq | Less | Leq | 
-             Greater | Geq | And | Or | Comma
+             Greater | Geq | And | Or
              [@@deriving show]
 
 type uop = Neg | Not [@@deriving show]

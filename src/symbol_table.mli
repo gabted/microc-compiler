@@ -10,4 +10,6 @@ val end_block : 'a t -> 'a t
 
 val add_entry : Ast.identifier -> 'a -> 'a t -> 'a t
 
-val lookup : Ast.identifier -> 'a t -> 'a option
+val global_lookup : Ast.identifier -> 'a t -> 'a option
+
+val local_lookup : Ast.identifier -> 'a t -> 'a option
