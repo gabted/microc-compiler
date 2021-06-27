@@ -187,7 +187,7 @@ let check (Prog(topdecls)) =
     |{loc; node=Fundecl f;}       -> addFun loc env f
   ) globalSymbolTable topdecls in
   (*Checks for existance and correctness of the main function*)
-  match local_lookup "main" (snd symTable) with
+  match lookup "main" (snd symTable) with
   |Some ([], TypI)
   |Some ([], TypV) -> ()
   |_ -> Util.raise_semantic_error dummy_pos "Incorrect or absent main function"
