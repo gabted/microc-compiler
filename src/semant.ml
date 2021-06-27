@@ -18,9 +18,9 @@ let checkVar loc (t, id)  =
 
 let addVar loc (env:enviroment) (t, id)  = 
   checkVar loc (t, id);
-  match local_lookup id (fst env) with
-  |None ->  (add_entry id t (fst env), snd env)
-  |Some(_) -> 
+  try 
+    (add_entry id t (fst env), snd env)
+  with DuplicateEntry -> 
     Util.raise_semantic_error loc ("Already declared variable: "^id)
 
 
@@ -66,7 +66,7 @@ let rec typeOf env {loc; node;} =
             "Incorrect operand types"
     )
     | Call(id, args)       -> 
-        (match global_lookup id (snd env) with
+        (match lookup id (snd env) with
           |None -> Util.raise_semantic_error loc
                 ("Undeclared function "^id)
           |Some(formalTypes, t) -> 
@@ -79,7 +79,7 @@ let rec typeOf env {loc; node;} =
 and typeOfAcc env {loc; node} =
   match node with
     |AccVar id -> 
-      (match global_lookup id (fst env) with
+      (match lookup id (fst env) with
         |None -> Util.raise_semantic_error loc
             ("Undeclared variable "^id)
         |Some  t -> t
@@ -161,9 +161,9 @@ let addFun loc env ({typ; fname; formals; body} as f) =
   let (varT, funT) = env in
     let newEnv = 
       let sign =(List.map fst formals, typ) in
-      match local_lookup fname funT with
-      |None ->  (varT, add_entry fname sign funT)
-      |Some(_) -> 
+      try
+        (varT, add_entry fname sign funT)
+      with DuplicateEntry -> 
         Util.raise_semantic_error loc ("Already declared function: "^fname)
     (*Checks the function in the updated enviroment, 
       in order to allow recursive definitions*)
