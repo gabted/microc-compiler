@@ -6,3 +6,4 @@ B _build/src
 
 PKG menhir
 PKG ppx_deriving
+PKG llvm
