@@ -1,12 +1,12 @@
 exception DuplicateEntry
 
-module MyMap = Map.Make(String)
+module StringMap = Map.Make(String)
 
-type 'a t = 'a MyMap.t list
+type 'a t = 'a StringMap.t list
 
-let empty_table = [MyMap.empty]
+let empty_table = [StringMap.empty]
 
-let begin_block table = MyMap.empty :: table
+let begin_block table = StringMap.empty :: table
 
 let end_block = function
 |[] -> failwith "Illegal Symbol_table state: More blocks ended then opened"
@@ -14,13 +14,13 @@ let end_block = function
 
 let add_entry symbol data = function
   |[] -> failwith "Illegal Symbol_table state: More blocks ended then opened"
-  |m::ms -> if MyMap.mem symbol m then
+  |m::ms -> if StringMap.mem symbol m then
               raise DuplicateEntry
             else
-              (MyMap.add symbol data m)::ms
+              (StringMap.add symbol data m)::ms
 
 let rec lookup symbol = function
 |[] -> None
-|m::ms ->  let d = MyMap.find_opt symbol m in
+|m::ms ->  let d = StringMap.find_opt symbol m in
             if Option.is_some d then d
             else lookup symbol ms

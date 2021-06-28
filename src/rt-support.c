@@ -3,7 +3,9 @@
 
 // TODO
 int getint(){
-  return 0;
+  int out;
+  scanf(" %d", &out)
+  return out;
 }
 
 void print(int n){
