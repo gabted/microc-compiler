@@ -32,6 +32,9 @@ let declareFun {typ; fname; formals; body;} =
   let funT = L.function_type returnT formalsT in
   L.define_function fname funT theModule 
 
+let declareLocalVar (t, id) builder = 
+  L.build_alloca (ltype_of_typ t) id builder
+
 (*Allocates a t typed variable on the stack, and stores
 the actual parameters in it*)
 let allocateParams builder env (t, id) v = 
@@ -44,34 +47,76 @@ let allocateParams builder env (t, id) v =
 let rec buildExpr env builder {loc; node;} = 
   match node with
   | ILiteral n           -> L.const_int int_t n     
-  | CLiteral c           -> L.const_int int_t 0   
-  | BLiteral b           -> L.const_int int_t 0      
-  | Access a             -> buildAcc env builder a
-  | _                    -> L.const_int int_t 0
+  | CLiteral c           -> L.const_int char_t (Char.code c) 
+  | BLiteral b           -> L.const_int bool_t (Bool.to_int b)      
+  | Access a             ->  (*a here is used as a R-value*)
+    let v = buildAcc env builder a in
+       L.build_load v "" builder
+  | Addr a               -> buildAcc env builder a
+  | Assign(a, e)         -> 
+      let v = buildExpr env builder e in
+      let addr = buildAcc env builder a in
+        L.build_store v addr builder
+  | UnaryOp(op, e)       -> 
+      (match (op) with
+      |Neg -> L.const_int int_t 0   
+      |Not -> L.const_int int_t 0   
+      )      
+  | BinaryOp(op, e1, e2) -> 
+    (match op with
+      |Add
+      |Sub
+      |Mult
+      |Div
+      |Mod  -> L.const_int int_t 0
+      |Equal
+      |Neq
+      |Less
+      |Leq
+      |Greater
+      |Geq  -> L.const_int int_t 0
+      |And
+      |Or -> L.const_int int_t 0
+  )
+  | Call(id, args)       -> 
+      let f = L.lookup_function id theModule |> Option.get in
+      let actuals = List.map (buildExpr env builder) args |> Array.of_list in
+      L.build_call f actuals (id^"_result") builder
+        
 and buildAcc env builder {loc; node} =
-match node with
-  |AccVar id -> 
-    let v = lookup id env |> Option.get in
-      L.build_load v id builder
-  |AccDeref e -> L.const_int int_t 0
-  |AccIndex(a, e) -> L.const_int int_t 0
-
-let buildStmt env builder {loc; node;} =
   match node with
-  |Return eOpt -> 
-    if Option.is_none eOpt then 
-      L.build_ret_void builder |> ignore
-    else 
-      let v = buildExpr env builder (Option.get eOpt) in
-      L.build_ret v builder |> ignore
-  |_ -> ()
+    |AccVar id -> 
+      lookup id env |> Option.get 
+    |AccDeref e -> 
+      let ptr = buildExpr env builder e in
+      let zero = L.const_int int_t 0 in
+      L.build_gep ptr [|zero|] "" builder 
+    |AccIndex(a, e) -> L.const_int int_t 0
 
-let buildBlock env builder l = 
-  List.iter (
-    fun n -> match n.node with
-    |Dec (t, id) -> ()
-    |Stmt s -> buildStmt env builder s
-  ) l
+let rec buildStmt env builder {loc; node;} =
+  match node with
+  | Block list      -> buildBlock env builder list
+  | Expr e          -> buildExpr env builder e |> ignore           
+  | If(e, s1, s2)   -> 
+      ()
+  | While(e, s)     -> 
+      () 
+  | Return eOpt -> 
+      if Option.is_none eOpt then 
+        L.build_ret_void builder |> ignore
+      else 
+        let v = buildExpr env builder (Option.get eOpt) in
+        L.build_ret v builder |> ignore
+
+
+and buildBlock env builder l = 
+  let blockEnv = env |> begin_block in
+    List.fold_left (
+      fun env n -> match n.node with
+      |Dec (t, id)  -> add_entry id (declareLocalVar (t, id) builder) env
+      |Stmt s       -> buildStmt env builder s; env
+    ) blockEnv l 
+  |> ignore
 
 let buildFunction ({typ; fname; formals; body;} as f) =
     let d = declareFun f in

@@ -86,7 +86,7 @@ and typeOfAcc env {loc; node} =
         )
     |AccDeref e -> 
         (match typeOf env e with
-          |TypP _ -> typeOf env e
+          |TypP t -> t
           |_ -> Util.raise_semantic_error loc
               ("dereferencing needs a pointer"))
     |AccIndex(a, e) -> 
