@@ -73,7 +73,7 @@ rule token = parse
     | eof                    { EOF }
     | [' ' '\t']             { token lexbuf }
     | '\n'                   { Lexing.new_line lexbuf; token lexbuf }
-    | "//"[^ '\n']*'\n'       { Lexing.new_line lexbuf; token lexbuf }
+    | "//"[^ '\n']*'\n'{ Lexing.new_line lexbuf; token lexbuf }
     | "/*"                   {multi_comment lexbuf;}
     | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ Char.escaped c) }
 

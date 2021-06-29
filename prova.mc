@@ -8,13 +8,13 @@ int mul(int a, int b){
 
 void increase(int *x){
     *x = 7;
+    return;
 }
 
 int main(){
     int a;
     a = 6;
     increase(&a);
-    return a;
+    print(a);
+    return 0;
 }
-
-int z;

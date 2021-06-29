@@ -81,7 +81,7 @@ let rec buildExpr env builder {loc; node;} =
   | Call(id, args)       -> 
       let f = L.lookup_function id theModule |> Option.get in
       let actuals = List.map (buildExpr env builder) args |> Array.of_list in
-      L.build_call f actuals (id^"_result") builder
+      L.build_call f actuals "" builder
         
 and buildAcc env builder {loc; node} =
   match node with
@@ -131,6 +131,9 @@ let buildFunction ({typ; fname; formals; body;} as f) =
   
 
 let to_ir (Prog(topdecls)) : L.llmodule =
+  L.set_target_triple "x86_64-pc-linux-gnu" theModule;
+  let print_t = L.function_type void_t [|int_t|] in
+  L.declare_function "print" print_t theModule |> ignore;
   List.iter ( 
     fun d -> match d.node with
     |Vardec(t, id)  ->  declareVar (t, id) |> ignore

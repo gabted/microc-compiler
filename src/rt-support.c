@@ -4,7 +4,7 @@
 // TODO
 int getint(){
   int out;
-  scanf(" %d", &out)
+  scanf(" %d", &out);
   return out;
 }
 
