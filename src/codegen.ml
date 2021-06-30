@@ -113,6 +113,12 @@ and buildBinOp env builder op e1 e2 =
   |And      -> L.build_and v1 v2 "and_result" builder
   |Or       -> L.build_or v1 v2 "or_result" builder
 
+let ifNoTerminator buildTerminator builder=
+  let block = L.insertion_block builder in
+  if Option.is_none (L.block_terminator block) 
+    then buildTerminator builder |> ignore
+    else ()
+
 let rec buildStmt env builder fundef {loc; node;} =
   match node with
   | Block list      -> buildBlock env builder fundef list
@@ -122,16 +128,29 @@ let rec buildStmt env builder fundef {loc; node;} =
       let thenBlock = L.append_block theContext "then" fundef in
       let elseBlock = L.append_block theContext "else" fundef in
       let mergeBlock = L.append_block theContext "merge" fundef in
-      let _ = L.build_cond_br guard thenBlock elseBlock builder in
-      L.position_at_end thenBlock builder;
-      let _ = buildStmt env builder fundef s1 in
-      let _ = L.build_br mergeBlock builder in
-      L.position_at_end elseBlock builder;
-      let _ = buildStmt env builder fundef s2 in
-      let _ = L.build_br mergeBlock builder in
-      L.position_at_end mergeBlock builder
+        L.build_cond_br guard thenBlock elseBlock builder |> ignore;
+        L.position_at_end thenBlock builder;
+          buildStmt env builder fundef s1 |> ignore;
+          ifNoTerminator 
+            (L.build_br mergeBlock) builder;
+        L.position_at_end elseBlock builder;
+          buildStmt env builder fundef s2 |> ignore;
+          ifNoTerminator 
+            (L.build_br mergeBlock) builder;
+        L.position_at_end mergeBlock builder
   | While(e, s)     -> 
-      () 
+    let guardBlock = L.append_block theContext "guard" fundef in
+    let loopBlock = L.append_block theContext "loop" fundef in
+    let contBlock = L.append_block theContext "continuation" fundef in
+      L.build_br guardBlock builder |> ignore;
+      L.position_at_end guardBlock builder;
+        let guard = buildExpr env builder e in
+        L.build_cond_br guard loopBlock contBlock builder |> ignore;
+      L.position_at_end loopBlock builder;
+        buildStmt env builder fundef s;
+        ifNoTerminator 
+          (L.build_br guardBlock) builder;
+      L.position_at_end contBlock builder
   | Return eOpt -> 
       if Option.is_none eOpt then 
         L.build_ret_void builder |> ignore
@@ -154,9 +173,13 @@ let buildFunction ({typ; fname; formals; body;} as f) =
     let actualsEnv = List.fold_left2 
       (allocateParams builder) empty_table formals actuals
     in
-    match body.node with 
+    (match body.node with 
       |Block l -> buildBlock actualsEnv builder d l  
-      |_ -> failwith "Illegal AST: function body must be a block"
+      |_ -> failwith "Illegal AST: function body must be a block");
+    match typ with
+      |TypV -> ifNoTerminator
+                (L.build_ret_void) builder
+      |_ -> ()
   
 
 let to_ir (Prog(topdecls)) : L.llmodule =
