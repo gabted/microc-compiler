@@ -15,10 +15,10 @@
     let join_stmts _s1 _s2 = 
       let {loc=p1; node=s1; } = _s1 in
       let {loc=p2; node=s2; } = _s2 in
-      let list = [Stmt _s1 @@ p1; Stmt _s2 @@ p2] in
-      Block list @@ (fst p1, snd p2)
+      let list = [Stmt _s1 @> p1; Stmt _s2 @> p2] in
+      Block list @> (fst p1, snd p2)
     
-    let skip = Block [] @@ dummy_pos
+    let skip = Block [] @> dummy_pos
 
     type descType = 
       | Id of string 
@@ -36,7 +36,8 @@
 %}//header
 
 /* Tokens declarations */
-%token IF RETURN ELSE FOR WHILE INT CHAR VOID NULL BOOL
+%token IF RETURN ELSE FOR WHILE DO
+%token INT CHAR VOID NULL BOOL
 %token TRUE FALSE
 %token REF PLUS MINUS TIMES DIV REMINDER ASSIGN 
 %token EQ NEQ LESS LEQ GREATER GEQ AND OR NOT
@@ -71,8 +72,8 @@ program:
   |  l=topDecl* EOF            {Prog(l)}
 
 topDecl:
-  | d=varDecl SEMI             {Vardec (fst d, snd d) @@ $loc}
-  | d=funDecl                  {Fundecl d @@ $loc}
+  | d=varDecl SEMI             {Vardec (fst d, snd d) @> $loc}
+  | d=funDecl                  {Fundecl d @> $loc}
 
 varDecl:
   |t=typ d=varDesc { buildType t d}
@@ -91,57 +92,66 @@ funDecl:
                   }
 
 block:
-  | LBRACE l=stmtOrDec* RBRACE {Block l @@ $loc}
+  | LBRACE l=stmtOrDec* RBRACE {Block l @> $loc}
 
 stmtOrDec:
-  |d=varDecl SEMI           {Dec (fst d, snd d) @@ $loc}
-  |s=statement              {Stmt s  @@ $loc}
+  |d=varDecl SEMI           {Dec (fst d, snd d) @> $loc}
+  |s=statement              {Stmt s  @> $loc}
 
 statement:
-  | RETURN e=expr? SEMI        {Return e @@ $loc}
-  | e=expr SEMI                 {Expr e @@ $loc}
+  | RETURN e=expr? SEMI        {Return e @> $loc}
+  | e=expr SEMI                 {Expr e @> $loc}
   | b=block                     {b}
-  | WHILE LPAREN e=expr RPAREN s=statement {While(e, s)  @@ $loc}
+  | WHILE LPAREN e=expr RPAREN s=statement {While(e, s)  @> $loc}
+  | DO s=statement WHILE LPAREN e=expr RPAREN SEMI
+        {(*desugarin dowhile into while*)
+          join_stmts s (While(e, s) @> $loc(s))
+        }
   | FOR LPAREN e1=expr? SEMI e2=expr SEMI e3=expr? RPAREN s=statement
-            { (*desugaring of for statement into while*)
-              let whileStmt = 
-                if Option.is_none e3 then 
-                  While(e2, s) @@ $loc(s)
-                else
-                  let incrStatement = Expr(Option.get e3) @@ $loc(e3) in
-                  let whileBody = join_stmts s incrStatement in
-                  While(e2, whileBody)@@ $loc(s) 
-              in
-              if Option.is_none e1 then
-                  whileStmt
-              else 
-                join_stmts (Expr(Option.get e1) @@ $loc(e1)) whileStmt
-            }
+        { (*desugaring of for statement into while*)
+          let whileStmt = 
+            if Option.is_none e3 then 
+              While(e2, s) @> $loc(s)
+            else
+              let incrStatement = Expr(Option.get e3) @> $loc(e3) in
+              let whileBody = join_stmts s incrStatement in
+              While(e2, whileBody)@> $loc(s) 
+          in
+          if Option.is_none e1 then
+              whileStmt
+          else 
+            join_stmts (Expr(Option.get e1) @> $loc(e1)) whileStmt
+        }
   | IF LPAREN e=expr RPAREN s1=statement ELSE s2=statement
-        {If(e, s1, s2) @@ $loc}
-  | IF LPAREN e=expr RPAREN s=statement %prec SHORTIF {If(e, s, skip) @@ $loc}
+        {If(e, s1, s2) @> $loc}
+  | IF LPAREN e=expr RPAREN s=statement %prec SHORTIF 
+        {If(e, s, skip) @> $loc}
 
 expr:
-  |e=lExpr  {Access e @@ $loc}
+  |e=lExpr  {Access e @> $loc}
   |e=rExpr  {e}
 
 lExpr:
-  |id=ID       {AccVar id @@ $loc}
+  |id=ID       {AccVar id @> $loc}
   |LPAREN e=lExpr RPAREN {e}
-  |TIMES e=aExpr  {AccDeref e @@ $loc}
-  |TIMES e=lExpr  {AccDeref(Access e @@ $loc) @@ $loc}
+  |TIMES e=aExpr  {AccDeref e @> $loc}
+  |TIMES e=lExpr  {AccDeref(Access e @> $loc) @> $loc}
   |e=lExpr LBRACKET i=expr RBRACKET
-        {AccIndex(e, i) @@ $loc}
+        {AccIndex(e, i) @> $loc}
 
 rExpr:
   |e=aExpr  {e}
   |id=ID LPAREN l=separated_list(COMMA, expr) RPAREN 
-    {Call(id, l) @@ $loc}
-  |le=lExpr ASSIGN v=expr {Assign(le, v) @@ $loc}
-  |NOT e=expr {UnaryOp(Not, e) @@ $loc}
-  |MINUS e=expr {UnaryOp(Neg, e) @@ $loc}
-  |e1=expr op=bin e2=expr {BinaryOp(op, e1, e2) @@ $loc}
-%inline bin:
+    {Call(id, l) @> $loc}
+  |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
+  |NOT e=expr {UnaryOp(Not, e) @> $loc}
+  |MINUS e=expr {UnaryOp(Neg, e) @> $loc}
+  |e1=expr op=arith_bin e2=expr {BinaryOp(op, e1, e2) @> $loc}
+  |e1=expr op=comp_bin e2=expr {BinaryOp(op, e1, e2) @> $loc}
+  |le=lExpr op=arith_bin ASSIGN e=expr 
+    {let v = BinaryOp(op, (Access(le)@>$loc(le)), e) @> $loc in
+      Assign(le, v) @> $loc}
+%inline arith_bin:
   |PLUS         {Add}
   |MINUS        {Sub} 
   |TIMES        {Mult}
@@ -149,6 +159,7 @@ rExpr:
   |REMINDER     {Mod}
   |AND          {And}
   |OR           {Or}
+%inline comp_bin:
   |LESS         {Less}
   |GREATER      {Greater}
   |LEQ          {Leq}
@@ -157,13 +168,13 @@ rExpr:
   |NEQ          {Neq}
 
 aExpr:
-  |n=LINT     {ILiteral n @@ $loc}
-  |c=LCHAR    {CLiteral c @@ $loc}
-  |TRUE       {BLiteral true @@ $loc}
-  |FALSE      {BLiteral false @@ $loc}
-  |NULL       {ILiteral 0 @@ $loc}
+  |n=LINT     {ILiteral n @> $loc}
+  |c=LCHAR    {CLiteral c @> $loc}
+  |TRUE       {BLiteral true @> $loc}
+  |FALSE      {BLiteral false @> $loc}
+  |NULL       {ILiteral 0 @> $loc}
   |LPAREN e=rExpr RPAREN {e}
-  |REF e=lExpr {Addr e @@ $loc}
+  |REF e=lExpr {Addr e @> $loc}
 
 typ:
   | INT          { TypI     }

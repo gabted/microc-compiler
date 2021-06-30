@@ -3,6 +3,9 @@ module L = Llvm
 let optimize_module llvm_module =
   let pass_manager = Llvm.PassManager.create () in
 
+  (* Loop Invariant Code Motion ?*)
+  Llvm_scalar_opts.add_licm pass_manager;
+
   (* memory to register promontion *)
   Llvm_scalar_opts.add_memory_to_register_promotion pass_manager;
 

@@ -11,7 +11,7 @@ let dummy_pos = (Lexing.dummy_pos, Lexing.dummy_pos)
 
 
 type 'a annotated_node = {loc : position[@opaque]; node : 'a; }[@@deriving show]
-let (@@) node loc = {loc = loc; node = node;} 
+let (@>) node loc = {loc = loc; node = node;} 
 
 (*let getNode = function
   |{loc=_; node=n; } -> n*)

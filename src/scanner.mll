@@ -16,6 +16,7 @@
         ("else", ELSE);
         ("for", FOR);
         ("while", WHILE);
+        ("do", DO);
         ("int", INT);
         ("char", CHAR);
         ("void", VOID);

@@ -70,7 +70,8 @@ let rec buildExpr env builder {loc; node;} =
   | Assign(a, e)         -> 
       let v = buildExpr env builder e in
       let addr = buildAcc env builder a in
-        L.build_store v addr builder
+        L.build_store v addr builder |> ignore;
+      v
   | UnaryOp(op, e)       -> 
       let v = buildExpr env builder e in
       (match (op) with
@@ -131,13 +132,26 @@ let rec buildStmt env builder fundef {loc; node;} =
         L.build_cond_br guard thenBlock elseBlock builder |> ignore;
         L.position_at_end thenBlock builder;
           buildStmt env builder fundef s1 |> ignore;
-          ifNoTerminator 
-            (L.build_br mergeBlock) builder;
         L.position_at_end elseBlock builder;
           buildStmt env builder fundef s2 |> ignore;
-          ifNoTerminator 
-            (L.build_br mergeBlock) builder;
-        L.position_at_end mergeBlock builder
+        (match (L.block_terminator thenBlock, 
+              L.block_terminator elseBlock) 
+         with
+          |None, None -> 
+            L.position_at_end thenBlock builder;
+              L.build_br mergeBlock |> ignore;
+            L.position_at_end elseBlock builder;
+              L.build_br mergeBlock |> ignore;
+            L.position_at_end mergeBlock builder
+          |None, Some _ ->
+            L.position_at_end thenBlock builder;
+              L.build_br mergeBlock |> ignore;
+            L.position_at_end mergeBlock builder
+          |Some _, None ->
+            L.position_at_end elseBlock builder;
+              L.build_br mergeBlock |> ignore;
+            L.position_at_end mergeBlock builder
+          |Some _, Some _ -> L.delete_block mergeBlock)
   | While(e, s)     -> 
     let guardBlock = L.append_block theContext "guard" fundef in
     let loopBlock = L.append_block theContext "loop" fundef in
