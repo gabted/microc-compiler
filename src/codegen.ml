@@ -139,17 +139,17 @@ let rec buildStmt env builder fundef {loc; node;} =
          with
           |None, None -> 
             L.position_at_end thenBlock builder;
-              L.build_br mergeBlock |> ignore;
+              L.build_br mergeBlock builder |> ignore;
             L.position_at_end elseBlock builder;
-              L.build_br mergeBlock |> ignore;
+              L.build_br mergeBlock builder |> ignore;
             L.position_at_end mergeBlock builder
           |None, Some _ ->
             L.position_at_end thenBlock builder;
-              L.build_br mergeBlock |> ignore;
+              L.build_br mergeBlock builder |> ignore;
             L.position_at_end mergeBlock builder
           |Some _, None ->
             L.position_at_end elseBlock builder;
-              L.build_br mergeBlock |> ignore;
+              L.build_br mergeBlock builder |> ignore;
             L.position_at_end mergeBlock builder
           |Some _, Some _ -> L.delete_block mergeBlock)
   | While(e, s)     -> 

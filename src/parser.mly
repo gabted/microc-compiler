@@ -39,7 +39,8 @@
 %token IF RETURN ELSE FOR WHILE DO
 %token INT CHAR VOID NULL BOOL
 %token TRUE FALSE
-%token REF PLUS MINUS TIMES DIV REMINDER ASSIGN 
+%token REF PLUS MINUS TIMES DIV REMINDER 
+%token ASSIGN MUL_ASSIGN DIV_ASSIGN	MOD_ASSIGN ADD_ASSIGN	SUB_ASSIGN
 %token EQ NEQ LESS LEQ GREATER GEQ AND OR NOT
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET COMMA SEMI
 %token <string>ID
@@ -146,12 +147,11 @@ rExpr:
   |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
   |NOT e=expr {UnaryOp(Not, e) @> $loc}
   |MINUS e=expr {UnaryOp(Neg, e) @> $loc}
-  |e1=expr op=arith_bin e2=expr {BinaryOp(op, e1, e2) @> $loc}
-  |e1=expr op=comp_bin e2=expr {BinaryOp(op, e1, e2) @> $loc}
-  |le=lExpr op=arith_bin ASSIGN e=expr 
+  |e1=expr op=bin_op e2=expr {BinaryOp(op, e1, e2) @> $loc}
+  |le=lExpr op=trasforming_assign  e=expr %prec ASSIGN
     {let v = BinaryOp(op, (Access(le)@>$loc(le)), e) @> $loc in
       Assign(le, v) @> $loc}
-%inline arith_bin:
+%inline bin_op:
   |PLUS         {Add}
   |MINUS        {Sub} 
   |TIMES        {Mult}
@@ -159,13 +159,19 @@ rExpr:
   |REMINDER     {Mod}
   |AND          {And}
   |OR           {Or}
-%inline comp_bin:
   |LESS         {Less}
   |GREATER      {Greater}
   |LEQ          {Leq}
   |GEQ          {Geq}
   |EQ           {Equal}
   |NEQ          {Neq}
+
+trasforming_assign:
+  | MUL_ASSIGN  {Mult}
+	| DIV_ASSIGN  {Div}
+	| MOD_ASSIGN  {Mod}
+	| ADD_ASSIGN  {Add}
+	| SUB_ASSIGN  {Sub}
 
 aExpr:
   |n=LINT     {ILiteral n @> $loc}

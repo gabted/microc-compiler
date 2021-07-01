@@ -54,8 +54,13 @@ rule token = parse
     | '/'                    { DIV }
     | '%'                    { REMINDER }
     | '='                    { ASSIGN }
+    | "*="                   { MUL_ASSIGN } 	 	
+    | "/="                   { DIV_ASSIGN }
+    | "%="                   { MOD_ASSIGN }
+    | "+="                   { ADD_ASSIGN }
+    | "-="                   { SUB_ASSIGN }
     | "=="                   { EQ }
-    | "!="                    { NEQ }
+    | "!="                   { NEQ }
     | '<'                    { LESS }
     | "<="                   { LEQ }
     | '>'                    { GREATER }

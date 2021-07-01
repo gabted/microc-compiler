@@ -2,7 +2,7 @@ int a[15];
 int c[3][20];
 
 void increase(int *x){
-    *x = (*x)+1;
+    *x += 1;
     return;
 }
 
@@ -15,9 +15,8 @@ int fib(int n){
 
 int main(){
     int i;
-    int j;
-    j=fib(4);
-    i=(j=fib(5));
-    print(i);
+    for(i = 0; i<15; i+=1)
+        a[i] = fib(i);
+    
     return 0;
 }
