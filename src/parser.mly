@@ -25,11 +25,11 @@
       | Pointer of descType
       | Array of descType * (int option)
     
-    let rec buildType t = function 
+    let rec buildTypeIdPair t = function 
       |Id s            -> (t, s) 
-      | Pointer d      -> let t1, s = buildType t d in
+      | Pointer d      -> let t1, s = buildTypeIdPair t d in
                               (TypP t1, s)
-      | Array(d, n) -> let t1, s = buildType t d in
+      | Array(d, n) -> let t1, s = buildTypeIdPair t d in
                               (TypA(t1, n), s)
 
   (*int **var -> (TypP(TypP int),var)*)
@@ -78,7 +78,7 @@ topDecl:
   | d=funDecl                  {Fundecl d @> $loc}
 
 varDecl:
-  |t=typ d=varDesc { buildType t d}
+  |t=typ d=varDesc { buildTypeIdPair t d}
 
 varDesc:
   |id=ID  {Id id}
