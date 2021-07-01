@@ -29,7 +29,7 @@
 
 (*definitions*)
 let digit = ['0' - '9']
-let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' '0'-'9']*
+let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']*
 
 (*rules*)
 rule token = parse
@@ -44,8 +44,8 @@ rule token = parse
                             }
     | id as word            {try
                                 Hashtbl.find keyword_table word
-                            with Not_found ->
-                                ID(word)
+                            with 
+                                Not_found ->    ID(word)
                             }
     | '&'                    { REF }
     | '+'                    { PLUS }
@@ -59,6 +59,8 @@ rule token = parse
     | "%="                   { MOD_ASSIGN }
     | "+="                   { ADD_ASSIGN }
     | "-="                   { SUB_ASSIGN }
+    | "++"                   { INCR }
+    | "--"                   { DECR }
     | "=="                   { EQ }
     | "!="                   { NEQ }
     | '<'                    { LESS }

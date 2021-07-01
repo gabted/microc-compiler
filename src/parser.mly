@@ -41,6 +41,7 @@
 %token TRUE FALSE
 %token REF PLUS MINUS TIMES DIV REMINDER 
 %token ASSIGN MUL_ASSIGN DIV_ASSIGN	MOD_ASSIGN ADD_ASSIGN	SUB_ASSIGN
+%token INCR DECR
 %token EQ NEQ LESS LEQ GREATER GEQ AND OR NOT
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET COMMA SEMI
 %token <string>ID
@@ -144,13 +145,17 @@ rExpr:
   |e=aExpr  {e}
   |id=ID LPAREN l=separated_list(COMMA, expr) RPAREN 
     {Call(id, l) @> $loc}
-  |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
   |NOT e=expr {UnaryOp(Not, e) @> $loc}
   |MINUS e=expr {UnaryOp(Neg, e) @> $loc}
   |e1=expr op=bin_op e2=expr {BinaryOp(op, e1, e2) @> $loc}
+  |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
   |le=lExpr op=trasforming_assign  e=expr %prec ASSIGN
     {let v = BinaryOp(op, (Access(le)@>$loc(le)), e) @> $loc in
       Assign(le, v) @> $loc}
+  |e=lExpr INCR {PostIncr e @> $loc}
+  |e=lExpr DECR {PostDecr e @> $loc}
+  |INCR e=lExpr {PreIncr  e @> $loc}
+  |DECR e=lExpr {PreDecr  e @> $loc}
 %inline bin_op:
   |PLUS         {Add}
   |MINUS        {Sub} 

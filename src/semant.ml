@@ -38,6 +38,12 @@ let rec typeOf env {loc; node;} =
           |tL, tR when tL <> tR -> Util.raise_semantic_error loc
             "lhs and rhs type discrepancy"  
           |tL, tR -> tL)
+    | PostIncr a 
+    | PostDecr a 
+    | PreIncr  a 
+    | PreDecr  a -> if typeOfAcc env a = TypI then TypI
+                    else Util.raise_semantic_error loc 
+                    "increment must be applied to numeric lvalues"
     | UnaryOp(op, e)       -> 
         (match (op, typeOf env e) with
         |Neg, TypI -> TypI
@@ -70,8 +76,11 @@ let rec typeOf env {loc; node;} =
           |None -> Util.raise_semantic_error loc
                 ("Undeclared function "^id)
           |Some(formalTypes, t) -> 
+              let compatible t1 t2 = match t1, t2 with
+                |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
+                |_ -> t1 = t2 in
               let actualTypes =  List.map (typeOf env) args in
-              if List.equal (=) formalTypes actualTypes 
+              if List.equal compatible formalTypes actualTypes 
                 then t
                 else Util.raise_semantic_error loc 
                   "Invalid actual parameters types"

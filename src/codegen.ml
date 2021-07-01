@@ -10,7 +10,8 @@ and char_t = L.i8_type theContext
 and bool_t = L.i1_type theContext
 and void_t = L.void_type theContext
 
-let zero = L.const_int int_t 0
+let c_zero = L.const_int int_t 0
+let c_one  = L.const_int int_t 1
 
 let rec ltype_of_typ = function
     TypI -> int_t
@@ -19,7 +20,7 @@ let rec ltype_of_typ = function
   | TypV -> void_t
   | TypP t -> L.pointer_type (ltype_of_typ t)
   | TypA (t, d) -> match d with
-        |None   -> L.array_type (ltype_of_typ t) 1 (*Clang implementation*)
+        |None   -> L.array_type (ltype_of_typ t) 0 (*Clang implementation*)
         |Some n -> L.array_type (ltype_of_typ t) n
 
 let declareLibraryFuns = 
@@ -62,8 +63,8 @@ let rec buildExpr env builder {loc; node;} =
   | BLiteral b           -> L.const_int bool_t (Bool.to_int b)      
   | Access a             ->  
     (*here a is used as a R-value, so it must be loaded*)
-    let v = buildAcc env builder a in
-       L.build_load v "" builder
+    let addr = buildAcc env builder a in
+       L.build_load addr "" builder
   | Addr a               -> 
     (*here we need the address of a, which is return buy buildAcc*)
     buildAcc env builder a
@@ -72,6 +73,26 @@ let rec buildExpr env builder {loc; node;} =
       let addr = buildAcc env builder a in
         L.build_store v addr builder |> ignore;
       v
+  | PostIncr a -> let addr = buildAcc env builder a in
+                  let oldV =  L.build_load addr "" builder in
+                  let newV = L.build_add oldV c_one "incr" builder in
+                  L.build_store newV addr builder |> ignore;
+                  oldV
+  | PostDecr a -> let addr = buildAcc env builder a in
+                  let oldV =  L.build_load addr "" builder in
+                  let newV = L.build_sub oldV c_one "incr" builder in
+                  L.build_store newV addr builder |> ignore;
+                  oldV
+  | PreIncr  a -> let addr = buildAcc env builder a in
+                  let oldV =  L.build_load addr "" builder in
+                  let newV = L.build_add oldV c_one "incr" builder in
+                  L.build_store newV addr builder |> ignore;
+                  newV
+  | PreDecr  a -> let addr = buildAcc env builder a in
+                  let oldV =  L.build_load addr "" builder in
+                  let newV = L.build_sub oldV c_one "incr" builder in
+                  L.build_store newV addr builder |> ignore;
+                  newV
   | UnaryOp(op, e)       -> 
       let v = buildExpr env builder e in
       (match (op) with
@@ -95,7 +116,7 @@ and buildAcc env builder {loc; node} =
     |AccIndex(a, e) -> 
       let index = buildExpr env builder e in
       let array = buildAcc env builder a in
-      L.build_gep array [|zero; index|] "array_addr" builder
+      L.build_gep array [|c_zero; index|] "array_addr" builder
 and buildBinOp env builder op e1 e2 = 
   let v1 = buildExpr env builder e1 in 
   let v2 = buildExpr env builder e2 in 
