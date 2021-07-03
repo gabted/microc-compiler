@@ -1,18 +1,20 @@
 
+int fib(int n){
+    if(n == 0 || n==1)
+        return 1;
+    else
+        return n*fib(n-1);
+}
 
-int main(){
-    int arr[5];
-    
-    arr[0] = 12;
-    arr[1] = 11;
-    arr[2] = 13;
-    arr[3] = 5;
-    arr[4] = 6;
-
-    //insertionSort(arr, 5);
-    int i;
-    for(i=0; i<5; i++)
+int main(){    
+    int size = 15;
+    int arr[15];
+    int i = 0;
+    for(; i<size;)
+        arr[i]=fib(i);
+    for(int i=0; i<size; i++)
         print(arr[i]);
 
+    int a = 42;
     return 0;
 }

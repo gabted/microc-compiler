@@ -8,22 +8,6 @@ open Symbol_table
 type funSignature = typ list * typ
 type enviroment = typ t * funSignature t
 
-let checkVar loc (t, id)  = 
-  match t with 
-      |TypV -> 
-          Util.raise_semantic_error loc "Variables cannot be void"
-      |TypA(_, Some n) when n<1 -> 
-          Util.raise_semantic_error loc "Arrays must have size at least 1"
-      |_ -> ()
-
-let addVar loc (env:enviroment) (t, id)  = 
-  checkVar loc (t, id);
-  try 
-    (add_entry id t (fst env), snd env)
-  with DuplicateEntry -> 
-    Util.raise_semantic_error loc ("Already declared variable: "^id)
-
-
 let rec typeOf env {loc; node;} =
   match node with
     | ILiteral n           -> TypI        
@@ -108,6 +92,35 @@ and typeOfAcc env {loc; node} =
           |_, _ -> Util.raise_semantic_error loc
               ("Cannot acces a non-Array variable"))
 
+let checkVarType loc t = 
+  match t with 
+  |TypV -> 
+      Util.raise_semantic_error loc "Variables cannot be void"
+  |TypA(_, Some n) when n<1 -> 
+      Util.raise_semantic_error loc "Arrays must have size at least 1"
+  |_ -> ()
+
+let addVar loc (env:enviroment) (t, id, v)  = 
+  checkVarType loc t;
+  if(Option.is_some v && typeOf env (Option.get v) <> t) then
+    Util.raise_semantic_error loc "Initializer expression of the wrong type"
+  else
+    try
+      (add_entry id t (fst env), snd env)
+    with DuplicateEntry -> 
+      Util.raise_semantic_error loc ("Already declared variable: "^id)
+
+
+let addLocalVar env {loc; node=(t, id, v)} = 
+  addVar loc env (t, id, v)
+
+let checkGlobalVar env d = ()
+
+let addGlobalVar env ({loc; node=(t, id, v)} as d) = 
+  checkGlobalVar env d; 
+  addVar loc env (t, id, v)
+    (*TODO: checking delle costanti*)
+
 let rec checkStmt env {loc; node;} returnT= 
   match node with
     | Block list      -> checkBlock env list returnT
@@ -134,7 +147,7 @@ and checkBlock (varT, funT) stmtList returnT=
     let initialEnv = (begin_block varT, begin_block funT) in
     List.fold_left (
       fun env node -> match node with
-        |{loc; node=Dec(t, id);} -> addVar loc env (t, id)
+        |{loc; node=Localdec d;} -> addLocalVar env d
         |{loc; node=Stmt s;}     -> checkStmt env s returnT; env
       ) initialEnv stmtList
     (*here the end_block operation is omitted since the 
@@ -155,7 +168,8 @@ let checkFun loc env {typ; fname; formals; body}=
   in
     let formalsEnv =  
       let initialEnv = (begin_block varT, begin_block funT) in
-      List.fold_left (addVar loc) initialEnv formals
+      let addFormal env (t, id) = addVar loc env (t, id, None) in
+      List.fold_left addFormal initialEnv formals
     in 
     checkReturnT typ;
     match body with 
@@ -163,8 +177,6 @@ let checkFun loc env {typ; fname; formals; body}=
       |_ -> failwith "Illegal AST: function body must be a block"
     (*here the end_block operation is omitted since the 
     return  value is ()*)
-  
-
   
 let addFun loc env ({typ; fname; formals; body} as f) = 
   let (varT, funT) = env in
@@ -192,7 +204,7 @@ let check (Prog(topdecls)) =
     A declaration is added only after checking it's semantic correctness*)
   let symTable = List.fold_left (
     fun env ann_node -> match ann_node with
-    |{loc; node=Vardec(t, id);}   -> addVar loc env (t, id)
+    |{loc; node=Globaldec d;}   -> addGlobalVar env d
     |{loc; node=Fundecl f;}       -> addFun loc env f
   ) globalSymbolTable topdecls in
   (*Checks for existance and correctness of the main function*)

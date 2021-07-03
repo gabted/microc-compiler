@@ -60,9 +60,12 @@ and stmt_node =
 
 and stmtordec = stmtordec_node annotated_node
 and stmtordec_node =                                                    
-  | Dec of typ * identifier          (* Local variable declaration  *)
+  | Localdec of var_decl          (* Local variable declaration  *)
   | Stmt of stmt                     (* A statement                 *)
   [@@deriving show]
+
+and var_decl = var_decl_node annotated_node
+and var_decl_node = typ * identifier *(expr option)
 
 type fun_decl = {
   typ : typ;
@@ -74,7 +77,7 @@ type fun_decl = {
 type topdecl = topdecl_node annotated_node
 and topdecl_node = 
   | Fundecl of fun_decl
-  | Vardec of typ * identifier
+  | Globaldec of var_decl
   [@@deriving show]
 
 type program = Prog of topdecl list [@@deriving show]

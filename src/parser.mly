@@ -5,19 +5,8 @@
 %{
     open Ast
 
-    (*
-    Given two annotated statements s1, s2,
-     build a an annotated block, conceptually equivalent to
-     { s1; s2; }
-     The statPos of the block is the startPos of s1, and the end is
-     the endPos of s2.
-     *)
-    let join_stmts _s1 _s2 = 
-      let {loc=p1; node=s1; } = _s1 in
-      let {loc=p2; node=s2; } = _s2 in
-      let list = [Stmt _s1 @> p1; Stmt _s2 @> p2] in
-      Block list @> (fst p1, snd p2)
-    
+   
+
     let skip = Block [] @> dummy_pos
 
     type descType = 
@@ -32,7 +21,24 @@
       | Array(d, n) -> let t1, s = buildTypeIdPair t d in
                               (TypA(t1, n), s)
 
-  (*int **var -> (TypP(TypP int),var)*)
+  (* Given two annotated statements s1, s2,
+    builds a an annotated block, conceptually equivalent to
+    { s1; s2; } *)
+  let join_stmts _s1 _s2 = 
+    let {loc=p1; node=s1; } = _s1 in
+    let {loc=p2; node=s2; } = _s2 in
+    let list = [Stmt _s1 @> p1; Stmt _s2 @> p2] in
+    Block list @> dummy_pos
+
+  let buildWhileStmt _guard _incr _body = 
+    let guard:expr = 
+      Option.value _guard ~default:(BLiteral true @> dummy_pos) in
+    let body:stmt =
+      match _incr with
+      |None -> _body
+      |Some e -> join_stmts _body (Expr e @> e.loc) in
+    While(guard, body) @> _body.loc
+      
 %}//header
 
 /* Tokens declarations */
@@ -74,11 +80,20 @@ program:
   |  l=topDecl* EOF            {Prog(l)}
 
 topDecl:
-  | d=varDecl SEMI             {Vardec (fst d, snd d) @> $loc}
-  | d=funDecl                  {Fundecl d @> $loc}
+  | d=varDecl SEMI             {Globaldec d @> $loc}
+  | f=funDecl                  {Fundecl f @> $loc}
+
+simpleDec:
+  |t=typ d=varDesc { buildTypeIdPair t d}
+
+initDec:
+  |t=typ d=varDesc ASSIGN e=expr 
+        { let (_t, id) = buildTypeIdPair t d
+          in (_t, id, Some(e))}
 
 varDecl:
-  |t=typ d=varDesc { buildTypeIdPair t d}
+  |d=simpleDec {(fst d, snd d, None) @> $loc}
+  |d=initDec   { d @> $loc}
 
 varDesc:
   |id=ID  {Id id}
@@ -88,7 +103,7 @@ varDesc:
   |d=varDesc LBRACKET n=LINT RBRACKET {Array(d, Some n)}
 
 funDecl:
-  |t=typ id=ID LPAREN p=separated_list(COMMA, varDecl) RPAREN b=block
+  |t=typ id=ID LPAREN p=separated_list(COMMA, simpleDec) RPAREN b=block
                   {
                     {typ=t; fname=id; formals=p; body = b }
                   }
@@ -97,8 +112,8 @@ block:
   | LBRACE l=stmtOrDec* RBRACE {Block l @> $loc}
 
 stmtOrDec:
-  |d=varDecl SEMI           {Dec (fst d, snd d) @> $loc}
-  |s=statement              {Stmt s  @> $loc}
+  |d=varDecl SEMI           {Localdec d @> $loc}
+  |s=statement              {Stmt s @> $loc}
 
 statement:
   | RETURN e=expr? SEMI        {Return e @> $loc}
@@ -109,21 +124,19 @@ statement:
         {(*desugarin dowhile into while*)
           join_stmts s (While(e, s) @> $loc(s))
         }
-  | FOR LPAREN e1=expr? SEMI e2=expr SEMI e3=expr? RPAREN s=statement
+  | FOR LPAREN e1=expr? SEMI e2=expr? SEMI e3=expr? RPAREN s=statement
         { (*desugaring of for statement into while*)
-          let whileStmt = 
-            if Option.is_none e3 then 
-              While(e2, s) @> $loc(s)
-            else
-              let incrStatement = Expr(Option.get e3) @> $loc(e3) in
-              let whileBody = join_stmts s incrStatement in
-              While(e2, whileBody)@> $loc(s) 
-          in
-          if Option.is_none e1 then
-              whileStmt
-          else 
-            join_stmts (Expr(Option.get e1) @> $loc(e1)) whileStmt
+          let whileStmt = buildWhileStmt e2 e3 s in
+          match e1 with 
+            |None ->  whileStmt
+            |Some e ->join_stmts (Expr e @> $loc(e1)) whileStmt
         }
+  | FOR LPAREN d=varDecl SEMI e2=expr? SEMI e3=expr? RPAREN s=statement
+      { (*desugaring of for statement into while*)
+        let whileStmt = buildWhileStmt e2 e3 s in
+        let list = [Localdec d @> $loc(d); Stmt whileStmt @> $loc(s)] in 
+        Block list @> $loc
+      }
   | IF LPAREN e=expr RPAREN s1=statement ELSE s2=statement
         {If(e, s1, s2) @> $loc}
   | IF LPAREN e=expr RPAREN s=statement %prec SHORTIF 

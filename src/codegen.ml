@@ -37,12 +37,10 @@ let declareFun {typ; fname; formals; body;} =
   let funT = L.function_type returnT formalsT in
   L.define_function fname funT theModule 
 
-let declareVar (t, id) = 
+let declareGlobalVar {loc; node=(t, id, _)} = 
   let init =  L.const_null (ltype_of_typ t) in
   L.define_global id init theModule
 
-let allocLocalVar (t, id) builder = 
-  L.build_alloca (ltype_of_typ t) id builder
 
 (*Allocates a t typed variable on the stack, and stores
 the actual parameters in it*)
@@ -135,6 +133,14 @@ and buildBinOp env builder op e1 e2 =
   |And      -> L.build_and v1 v2 "and_result" builder
   |Or       -> L.build_or v1 v2 "or_result" builder
 
+let allocLocalVar env builder {loc; node=(t, id, v)} = 
+    let address = L.build_alloca (ltype_of_typ t) id builder in
+    if Option.is_some v then 
+      let value = buildExpr env builder (Option.get v) in
+      L.build_store value address builder |> ignore;
+    else ();
+    address
+
 let ifNoTerminator buildTerminator builder=
   let block = L.insertion_block builder in
   if Option.is_none (L.block_terminator block) 
@@ -196,8 +202,12 @@ and buildBlock env builder fundef l =
   let blockEnv = env |> begin_block in
     List.fold_left (
       fun env n -> match n.node with
-      |Dec (t, id)  -> add_entry id (allocLocalVar (t, id) builder) env
-      |Stmt s       -> buildStmt env builder fundef s; env
+      |Localdec d -> 
+          let {loc; node=(t, id, c)} = d in
+          let address = allocLocalVar env builder d in
+            add_entry id address env
+      |Stmt s     -> 
+          buildStmt env builder fundef s; env
     ) blockEnv l 
   |> ignore
 
@@ -222,7 +232,7 @@ let to_ir (Prog(topdecls)) : L.llmodule =
   declareLibraryFuns |> ignore ;
   List.iter ( 
     fun d -> match d.node with
-    |Vardec(t, id)  ->  declareVar (t, id) |> ignore
+    |Globaldec d    ->  ()(*declareGlobalVar d |> ignore*)
     |Fundecl f      ->  buildFunction f
   ) topdecls;
   theModule
