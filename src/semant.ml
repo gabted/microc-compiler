@@ -114,12 +114,38 @@ let addVar loc (env:enviroment) (t, id, v)  =
 let addLocalVar env {loc; node=(t, id, v)} = 
   addVar loc env (t, id, v)
 
-let checkGlobalVar env d = ()
+(*
+let isIntegerConstant {loc; node} = 
+  match node with
+  |ILiteral _ -> true
 
-let addGlobalVar env ({loc; node=(t, id, v)} as d) = 
-  checkGlobalVar env d; 
-  addVar loc env (t, id, v)
-    (*TODO: checking delle costanti*)
+let rec checkConstantExpr v =  
+  match v.node with
+    | ILiteral _                   
+    | CLiteral _            
+    | BLiteral _           -> true (*Arithmetic constant expression*)
+    | Addr     _           -> false     
+    | UnaryOp(op, e)       -> 
+        checkConstantExpr e
+    | BinaryOp(op, e1, e2) -> 
+        checkConstantExpr e1 && checkConstantExpr e2
+    | Access _                           
+    | Assign _         
+    | Call   _ 
+    | PostIncr _ 
+    | PostDecr _ 
+    | PreIncr  _ 
+    | PreDecr  _            -> false
+*)
+
+let addGlobalVar env {loc; node=(t, id, v)} = 
+  (*if Option.is_some v && not(checkConstantExpr (Option.get v))
+    then 
+      Util.raise_semantic_error loc "initializer element must be constant"
+    else *)
+  match v with
+    |Some _ -> Util.raise_semantic_error loc "cant inizialize global var";
+    |None   -> addVar loc env (t, id, v)
 
 let rec checkStmt env {loc; node;} returnT= 
   match node with

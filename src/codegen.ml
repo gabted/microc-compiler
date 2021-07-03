@@ -232,7 +232,7 @@ let to_ir (Prog(topdecls)) : L.llmodule =
   declareLibraryFuns |> ignore ;
   List.iter ( 
     fun d -> match d.node with
-    |Globaldec d    ->  ()(*declareGlobalVar d |> ignore*)
+    |Globaldec d    ->  declareGlobalVar d |> ignore
     |Fundecl f      ->  buildFunction f
   ) topdecls;
   theModule
