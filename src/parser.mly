@@ -53,6 +53,7 @@
 %token <string>ID
 %token <int>LINT
 %token <char>LCHAR
+%token <string>LSTRING
 %token EOF
 
 /* Precedence and associativity specification */
@@ -194,6 +195,7 @@ trasforming_assign:
 aExpr:
   |n=LINT     {ILiteral n @> $loc}
   |c=LCHAR    {CLiteral c @> $loc}
+  |s=LSTRING  {SLiteral s @> $loc}
   |TRUE       {BLiteral true @> $loc}
   |FALSE      {BLiteral false @> $loc}
   |NULL       {ILiteral 0 @> $loc}

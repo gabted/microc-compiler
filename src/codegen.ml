@@ -25,7 +25,9 @@ let rec ltype_of_typ = function
 
 let declareLibraryFuns = 
   let print_t = L.function_type void_t [|int_t|] in
-  let _ = L.declare_function "print" print_t theModule in
+  L.declare_function "print" print_t theModule |> ignore;
+  let printChar_t = L.function_type void_t [|char_t|] in
+  L.declare_function "print_char" printChar_t theModule |> ignore;
   let getint_t = L.function_type int_t [||] in
   L.declare_function "getint" getint_t theModule
 
@@ -58,7 +60,8 @@ let rec buildExpr env builder {loc; node;} =
   match node with
   | ILiteral n           -> L.const_int int_t n     
   | CLiteral c           -> L.const_int char_t (Char.code c) 
-  | BLiteral b           -> L.const_int bool_t (Bool.to_int b)      
+  | BLiteral b           -> L.const_int bool_t (Bool.to_int b)   
+  | SLiteral s           -> L.build_global_string s "const_str" builder  
   | Access a             ->  
     (*here a is used as a R-value, so it must be loaded*)
     let addr = buildAcc env builder a in
@@ -133,7 +136,19 @@ and buildBinOp env builder op e1 e2 =
   |And      -> L.build_and v1 v2 "and_result" builder
   |Or       -> L.build_or v1 v2 "or_result" builder
 
+let allocConstString id str builder =
+  let globalVar = L.build_global_string str "const_str" builder in
+  let varT = L.element_type (L.type_of globalVar) in
+  let value = L.build_load globalVar "temp" builder in
+  let address = L.build_alloca varT id builder in
+  L.build_store value address builder |> ignore;
+  address
+
 let allocLocalVar env builder {loc; node=(t, id, v)} = 
+  match v with
+  |Some({loc; node=SLiteral s}) -> 
+      allocConstString id s builder
+  |_ ->  
     let address = L.build_alloca (ltype_of_typ t) id builder in
     if Option.is_some v then 
       let value = buildExpr env builder (Option.get v) in

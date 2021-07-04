@@ -13,9 +13,6 @@ let dummy_pos = (Lexing.dummy_pos, Lexing.dummy_pos)
 type 'a annotated_node = {loc : position[@opaque]; node : 'a; }[@@deriving show]
 let (@>) node loc = {loc = loc; node = node;} 
 
-(*let getNode = function
-  |{loc=_; node=n; } -> n*)
-
 type typ =
   | TypI                             (* Type int                    *)
   | TypB                             (* Type bool                   *)
@@ -37,6 +34,7 @@ and expr_node =
   | ILiteral of int                  (* Integer literal             *)
   | CLiteral of char                 (* Char literal                *)
   | BLiteral of bool                 (* Bool literal                *)
+  | SLiteral of string               (* String literal              *)
   | UnaryOp of uop * expr            (* Unary primitive operator    *)
   | BinaryOp of binop * expr * expr  (* Binary primitive operator   *)
   | Call of identifier * expr list   (* Function call f(...)        *)

@@ -1,6 +1,5 @@
 
 int ueue;
-
 int fib(int n){
     if(n == 0 || n==1)
         return 1;
@@ -9,13 +8,16 @@ int fib(int n){
 }
 
 int main(){    
-    int size = 15;
+    char x = 'g';
+    char s[] = "h\tello\n";
+    for(int i = 0; i<7; i++)
+        print_char(s[i]);
     int arr[15];
-    int i = 0;
-    for(; i<size;)
+    arr[2] = 4;
+    for(int i = 0; i<15; i++)
         arr[i]=fib(i);
-    for(int i=0; i<size; i++)
-        print(arr[i]);
+    //for(int i=0; i<15; i++)
+        //print(arr[i]);
 
     int a = 42;
     return 0;

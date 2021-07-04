@@ -8,11 +8,16 @@ open Symbol_table
 type funSignature = typ list * typ
 type enviroment = typ t * funSignature t
 
+let compatible t1 t2 = match t1, t2 with
+    |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
+    |_ -> t1 = t2 
+
 let rec typeOf env {loc; node;} =
   match node with
     | ILiteral n           -> TypI        
     | CLiteral c           -> TypC       
-    | BLiteral b           -> TypB      
+    | BLiteral b           -> TypB  
+    | SLiteral s           -> TypA(TypC, Some((String.length s)+1))   
     | Access a             -> typeOfAcc env a               
     | Addr a               -> TypP(typeOfAcc env a)     
     | Assign(a, e)         -> 
@@ -60,9 +65,6 @@ let rec typeOf env {loc; node;} =
           |None -> Util.raise_semantic_error loc
                 ("Undeclared function "^id)
           |Some(formalTypes, t) -> 
-              let compatible t1 t2 = match t1, t2 with
-                |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
-                |_ -> t1 = t2 in
               let actualTypes =  List.map (typeOf env) args in
               if List.equal compatible formalTypes actualTypes 
                 then t
@@ -86,7 +88,7 @@ and typeOfAcc env {loc; node} =
         let tA = typeOfAcc env a in
         let tI = typeOf env e in
         (match tA, tI with
-          |TypA(t, _),TypI -> t (*aggiungere checking statico di Out of BOund?*)
+          |TypA(t, _),TypI -> t 
           |TypA _, _ -> Util.raise_semantic_error loc
               ("Array index must be int")
           |_, _ -> Util.raise_semantic_error loc
@@ -102,7 +104,8 @@ let checkVarType loc t =
 
 let addVar loc (env:enviroment) (t, id, v)  = 
   checkVarType loc t;
-  if(Option.is_some v && typeOf env (Option.get v) <> t) then
+  if Option.is_some v && 
+    not(compatible t (typeOf env (Option.get v))) then
     Util.raise_semantic_error loc "Initializer expression of the wrong type"
   else
     try
@@ -221,6 +224,7 @@ let globalSymbolTable =
   let funTable = 
       empty_table |>
       add_entry "print" ([TypI], TypV) |>
+      add_entry "print_char" ([TypC], TypV) |>
       add_entry "getint" ([], TypI)
   in  
   (varTable, funTable)

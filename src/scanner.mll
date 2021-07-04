@@ -30,6 +30,7 @@
 (*definitions*)
 let digit = ['0' - '9']
 let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']*
+let ES = '\\'['n' 'r' 't' '\\' '\'' '\"']
 
 (*rules*)
 rule token = parse
@@ -42,6 +43,9 @@ rule token = parse
                              {let c = s.[1] in
                                 LCHAR(c)
                             }
+    |'\"' ((ES|[^ '\n' '\\' '\"'])* as s) '\"'
+                            {
+                                 LSTRING(Scanf.unescaped s) }
     | id as word            {try
                                 Hashtbl.find keyword_table word
                             with 
