@@ -30,7 +30,7 @@
 (*definitions*)
 let digit = ['0' - '9']
 let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']*
-let ES = '\\'['n' 'r' 't' '\\' '\'' '\"']
+let ES = '\\'['n' 'r' 't' '0' '\\' '\'' '\"']
 
 (*rules*)
 rule token = parse
@@ -39,8 +39,9 @@ rule token = parse
                                 |Some(num) -> LINT(num)
                                 |None -> Util.raise_lexer_error lexbuf (Lexing.lexeme lexbuf ^": Invalid int format")
                             }
-    |'\''['a'-'z' 'A'-'Z' '0' - '9']'\'' as s   
-                             {let c = s.[1] in
+    |'\''(ES|['a'-'z' 'A'-'Z' '0' - '9'] as s)'\''    
+                             {let _s = Scanf.unescaped s in
+                              let c = _s.[0] in
                                 LCHAR(c)
                             }
     |'\"' ((ES|[^ '\n' '\\' '\"'])* as s) '\"'

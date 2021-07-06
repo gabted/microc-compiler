@@ -20,8 +20,8 @@ let rec ltype_of_typ = function
   | TypV -> void_t
   | TypP t -> L.pointer_type (ltype_of_typ t)
   | TypA (t, d) -> match d with
-        |None   -> L.array_type (ltype_of_typ t) 0 (*Clang implementation*)
-        |Some n -> L.array_type (ltype_of_typ t) n
+    |None   -> L.pointer_type (ltype_of_typ t) (*Clang implementation*)
+    |Some n -> L.array_type (ltype_of_typ t) n
 
 let declareLibraryFuns = 
   let print_t = L.function_type void_t [|int_t|] in
@@ -54,26 +54,30 @@ let allocateParams builder env (t, id) v =
   add_entry id addr env
 
 
-  
+let isArray v = 
+  match L.classify_type (L.element_type(L.type_of v)) with
+  |L.TypeKind.Array -> true
+  |_ -> false
 
 let rec buildExpr env builder {loc; node;} = 
   match node with
   | ILiteral n           -> L.const_int int_t n     
   | CLiteral c           -> L.const_int char_t (Char.code c) 
   | BLiteral b           -> L.const_int bool_t (Bool.to_int b)   
-  | SLiteral s           -> L.build_global_string s "const_str" builder  
+  | SLiteral s           -> let global = L.build_global_string s "const_str" builder 
+                            in L.build_load global "temp" builder  
   | Access a             ->  
     (*here a is used as a R-value, so it must be loaded*)
     let addr = buildAcc env builder a in
-       L.build_load addr "" builder
+    L.build_load addr "" builder
   | Addr a               -> 
-    (*here we need the address of a, which is return buy buildAcc*)
+    (*here we need the address of a, which is returned by buildAcc*)
     buildAcc env builder a
   | Assign(a, e)         -> 
-      let v = buildExpr env builder e in
+      let value = buildExpr env builder e in
       let addr = buildAcc env builder a in
-        L.build_store v addr builder |> ignore;
-      v
+        L.build_store value addr builder |> ignore;
+      value
   | PostIncr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
                   let newV = L.build_add oldV c_one "incr" builder in
@@ -103,8 +107,18 @@ let rec buildExpr env builder {loc; node;} =
   | BinaryOp(op, e1, e2) -> 
       buildBinOp env builder op e1 e2
   | Call(id, args)       -> 
+      let array_decay = function
+        |{loc; node=SLiteral s} as e -> 
+            buildExpr env builder e
+        |{loc; node=Access a} -> 
+          let addr = buildAcc env builder a in
+          if isArray addr then 
+            L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
+          else
+            L.build_load addr "" builder
+        |e -> buildExpr env builder e in
+      let actuals = List.map array_decay args |> Array.of_list in
       let f = L.lookup_function id theModule |> Option.get in
-      let actuals = List.map (buildExpr env builder) args |> Array.of_list in
       L.build_call f actuals "" builder
 and buildAcc env builder {loc; node} =
   match node with
@@ -117,7 +131,13 @@ and buildAcc env builder {loc; node} =
     |AccIndex(a, e) -> 
       let index = buildExpr env builder e in
       let array = buildAcc env builder a in
-      L.build_gep array [|c_zero; index|] "array_addr" builder
+      match L.classify_type (L.element_type (L.type_of array)) with
+      |L.TypeKind.Array ->
+        L.build_gep array [|c_zero; index|] "elem_addr" builder
+      |L.TypeKind.Pointer ->
+        let first_el = L.build_load array "base_addr" builder in
+        L.build_gep first_el [|index|] "elem_addr" builder
+      |_ -> failwith "Accessing not an array"
 and buildBinOp env builder op e1 e2 = 
   let v1 = buildExpr env builder e1 in 
   let v2 = buildExpr env builder e2 in 
@@ -136,25 +156,19 @@ and buildBinOp env builder op e1 e2 =
   |And      -> L.build_and v1 v2 "and_result" builder
   |Or       -> L.build_or v1 v2 "or_result" builder
 
-let allocConstString id str builder =
-  let globalVar = L.build_global_string str "const_str" builder in
-  let varT = L.element_type (L.type_of globalVar) in
-  let value = L.build_load globalVar "temp" builder in
-  let address = L.build_alloca varT id builder in
-  L.build_store value address builder |> ignore;
-  address
-
 let allocLocalVar env builder {loc; node=(t, id, v)} = 
   match v with
-  |Some({loc; node=SLiteral s}) -> 
-      allocConstString id s builder
-  |_ ->  
-    let address = L.build_alloca (ltype_of_typ t) id builder in
-    if Option.is_some v then 
-      let value = buildExpr env builder (Option.get v) in
-      L.build_store value address builder |> ignore;
-    else ();
+  |None -> 
+    L.build_alloca (ltype_of_typ t) id builder
+  |Some e ->
+    let value = buildExpr env builder e in
+    let value_t = L.type_of value in
+    (*Thanks to semantic cheking, we are sure that value_t
+    is a compatible value with t*)
+    let address = L.build_alloca value_t id builder in
+    let _ = L.build_store value address builder in
     address
+
 
 let ifNoTerminator buildTerminator builder=
   let block = L.insertion_block builder in

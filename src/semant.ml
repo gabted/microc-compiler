@@ -51,6 +51,8 @@ let rec typeOf env {loc; node;} =
         |Mod, TypI, TypI     -> TypI
         |Equal, TypI, TypI
         |Neq, TypI, TypI
+        |Equal, TypC, TypC
+        |Neq, TypC, TypC
         |Less, TypI, TypI
         |Leq, TypI, TypI
         |Greater, TypI, TypI

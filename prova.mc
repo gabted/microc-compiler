@@ -7,18 +7,27 @@ int fib(int n){
         return n*fib(n-1);
 }
 
-int main(){    
-    char x = 'g';
-    char s[] = "h\tello\n";
-    for(int i = 0; i<7; i++)
-        print_char(s[i]);
-    int arr[15];
-    arr[2] = 4;
-    for(int i = 0; i<15; i++)
-        arr[i]=fib(i);
-    //for(int i=0; i<15; i++)
-        //print(arr[i]);
+void sort(int a[], int dim){
+    for(int i = 0; i<dim; i++)
+        a[i]=fib(i);
+}
 
-    int a = 42;
+void printString(char s[]){
+    int i = 0;
+    while(s[i] != '\n')
+        print_char(s[i++]);
+}
+
+int main(){  
+    /*char s[] = "ciao bello";
+    for(int i= 0; i<10; i++)
+        print_char(s[i]);*/
+    int arr[15];
+    arr[2] = 17;
+    sort(arr, 15); 
+    char s[] = "ciao \n bello";
+    printString(s);
+    //for(int i = 0; i<15; i++)
+      //  print(arr[i]);  
     return 0;
 }
