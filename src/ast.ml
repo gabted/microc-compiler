@@ -26,7 +26,7 @@ type typ =
 and expr =  expr_node annotated_node                                                   
 and expr_node =     
   | Access of access                 (* x    or  *p    or  a[e]     *) 
-  | Assign of access * expr          (* x=e  or  *p=e  or  a[e]=e   *)
+  | Assign of access * expr *binop option (* x=e  or  *p=e  or  a[e]=e   *)
   | PostIncr of access                   (* x++  or  *p++  or  a[e]++   *)
   | PostDecr of access                   (* x--  or  *p--  or  a[e]--   *)
   | PreIncr of access                   (* ++x  or  ++*p  or  ++a[e]   *)

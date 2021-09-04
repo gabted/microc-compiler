@@ -75,10 +75,16 @@ let rec buildExpr env builder {loc; node;} =
   | Addr a               -> 
     (*here we need the address of a, which is returned by buildAcc*)
     buildAcc env builder a
-  | Assign(a, e)         -> 
-      let value = buildExpr env builder e in
+  | Assign(a, e, _op)         -> 
       let addr = buildAcc env builder a in
-        L.build_store value addr builder |> ignore;
+      let expr_value = buildExpr env builder e in
+      let value = match _op with
+        None -> expr_value
+        |Some(op) -> 
+          let oldV =  L.build_load addr "" builder in 
+          buildBinOp env builder op oldV expr_value
+      in
+      L.build_store value addr builder |> ignore;
       value
   | PostIncr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
@@ -107,7 +113,9 @@ let rec buildExpr env builder {loc; node;} =
       |Not -> L.build_not v "not_result" builder   
       )      
   | BinaryOp(op, e1, e2) -> 
-      buildBinOp env builder op e1 e2
+    let v1 = buildExpr env builder e1 in 
+    let v2 = buildExpr env builder e2 in 
+    buildBinOp env builder op v1 v2
   | Call(id, args)       -> 
       (*array_decay is applied on expressions*)
       let array_decay = function
@@ -141,9 +149,7 @@ and buildAcc env builder {loc; node} =
         let first_el = L.build_load array "base_addr" builder in
         L.build_gep first_el [|index|] "elem_addr" builder
       |_ -> failwith "Accessing not an array"
-and buildBinOp env builder op e1 e2 = 
-  let v1 = buildExpr env builder e1 in 
-  let v2 = buildExpr env builder e2 in 
+and buildBinOp env builder op v1 v2 =  
   match op with 
   |Add      -> L.build_add v1 v2 "add_result" builder
   |Sub      -> L.build_sub v1 v2 "sub_result" builder

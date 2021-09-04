@@ -173,15 +173,14 @@ rExpr:
   |e=aExpr  {e}
   |id=ID LPAREN l=separated_list(COMMA, expr) RPAREN 
     {Call(id, l) @> $loc}
+  |e1=expr op=bin_op e2=expr 
+    {BinaryOp(op, e1, e2) @> $loc}
+  |le=lExpr ASSIGN v=expr 
+      {Assign(le, v, None) @> $loc} 
+  |le=lExpr op=ass_op v=expr %prec ASSIGN
+      {Assign(le, v, Some(op)) @> $loc} 
   |NOT e=expr {UnaryOp(Not, e) @> $loc}
   |MINUS e=expr {UnaryOp(Neg, e) @> $loc}
-  |e1=expr op=bin_op e2=expr {BinaryOp(op, e1, e2) @> $loc}
-  |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
-  |le=lExpr op=trasforming_assign  e=expr %prec ASSIGN
-    (*Desugaring of +=, -=, *=, etc 
-     x += 1 becomes x += x+1*)
-    {let v = BinaryOp(op, (Access(le)@>$loc(le)), e) @> $loc in
-      Assign(le, v) @> $loc}
   |e=lExpr INCR {PostIncr e @> $loc}
   |e=lExpr DECR {PostDecr e @> $loc}
   |INCR e=lExpr {PreIncr  e @> $loc}
@@ -200,13 +199,12 @@ rExpr:
   |GEQ          {Geq}
   |EQ           {Equal}
   |NEQ          {Neq}
-
-trasforming_assign:
-  | MUL_ASSIGN  {Mult}
-	| DIV_ASSIGN  {Div}
-	| MOD_ASSIGN  {Mod}
-	| ADD_ASSIGN  {Add}
-	| SUB_ASSIGN  {Sub}
+ass_op:
+  |MUL_ASSIGN    {Mult}
+  |DIV_ASSIGN    {Div}
+  |MOD_ASSIGN    {Mod}
+  |ADD_ASSIGN    {Add}
+  |SUB_ASSIGN    {Sub}
 
 aExpr:
   |n=LINT     {ILiteral n @> $loc}

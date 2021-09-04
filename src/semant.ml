@@ -16,6 +16,18 @@ let compatible t1 t2 = match t1, t2 with
     |TypP(_), TypNullP -> true
     |_ -> t1 = t2 
 
+let binopTypeConversions op t1 t2 loc = 
+  match (op, t1, t2) with
+    |(Add|Sub|Mult|Div|Mod), TypI, TypI   -> TypI
+    |(Equal|Neq), TypI, TypI
+    |(Equal|Neq), TypC, TypC
+    |(Less|Leq|Greater|Geq), TypI, TypI   -> TypB
+    |(And|Or), TypB, TypB                  -> TypB
+    |Equal, TypP _, TypNullP -> TypB
+    |_ -> Util.raise_semantic_error loc 
+      "Incorrect operand types"
+
+
 let rec typeOf env {loc; node;} =
   match node with
     | ILiteral n           -> TypI        
@@ -25,13 +37,21 @@ let rec typeOf env {loc; node;} =
     | SLiteral s           -> TypA(TypC, Some((String.length s)+1))   
     | Access a             -> typeOfAcc env a               
     | Addr a               -> TypP(typeOfAcc env a)     
-    | Assign(a, e)         -> 
-        (match (typeOfAcc env a, typeOf env e) with
+    | Assign(a, e, _op)     -> 
+        let tL = typeOfAcc env a in
+        let tExpr = typeOf env e in
+        let tR =  match _op with
+          |None -> tExpr
+          |Some(op) -> 
+            binopTypeConversions op tL tExpr loc
+          in
+        (match (tL, tR) with
           |TypA _ ,_  -> Util.raise_semantic_error loc 
             "Cannot assign an array"
           |tL, tR when not(compatible tL tR) -> Util.raise_semantic_error loc
             "lhs and rhs type discrepancy"  
-          |tL, tR -> tL)
+          |tL, tR -> tL
+        )
     | PostIncr a 
     | PostDecr a 
     | PreIncr  a 
@@ -48,26 +68,9 @@ let rec typeOf env {loc; node;} =
             "! requires a boolean value"
         )      
     | BinaryOp(op, e1, e2) -> 
-      (match (op, typeOf env e1, typeOf env e2) with
-        |Add, TypI, TypI
-        |Sub, TypI, TypI
-        |Mult, TypI, TypI
-        |Div, TypI, TypI
-        |Mod, TypI, TypI     -> TypI
-        |Equal, TypI, TypI
-        |Neq, TypI, TypI
-        |Equal, TypC, TypC
-        |Neq, TypC, TypC
-        |Less, TypI, TypI
-        |Leq, TypI, TypI
-        |Greater, TypI, TypI
-        |Geq, TypI, TypI     -> TypB
-        |And, TypB, TypB
-        |Or, TypB, TypB     -> TypB
-        |Equal, TypP _, TypNullP -> TypB
-        |_ -> Util.raise_semantic_error loc 
-            "Incorrect operand types"
-    )
+      let t1 = typeOf env e1 in
+      let t2 = typeOf env e2 in
+      binopTypeConversions op t1 t2 loc
     | Call(id, args)       -> 
         (match lookup id (snd env) with
           |None -> Util.raise_semantic_error loc
@@ -100,7 +103,7 @@ and typeOfAcc env {loc; node} =
           |TypA _, _ -> Util.raise_semantic_error loc
               ("Array index must be int")
           |_, _ -> Util.raise_semantic_error loc
-              ("Cannot acces a non-Array variable"))
+              ("Cannot acces a non-Array variable")) 
 
 let checkVarType loc t = 
   match t with 
