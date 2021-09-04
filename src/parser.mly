@@ -6,14 +6,18 @@
     open Ast
 
    
-
+    (*empty statement*)
     let skip = Block [] @> dummy_pos
 
+    (*Used to store information about a variable
+    delcaration*)
     type descType = 
       | Id of string 
       | Pointer of descType
       | Array of descType * (int option)
     
+    (*Accepts a Ast.typ and a descType, and 
+    builds the correct (type, id) pair*)
     let rec buildTypeIdPair t = function 
       |Id s            -> (t, s) 
       | Pointer d      -> let t1, s = buildTypeIdPair t d in
@@ -30,6 +34,14 @@
     let list = [Stmt _s1 @> p1; Stmt _s2 @> p2] in
     Block list @> dummy_pos
 
+  (*builds the AST of the statement
+    while(_guard){
+      _body;
+      _incr;
+    }
+    if _guard is None, the boolean constant True is used instead
+    if _incr is none, nothing is appended at the end of the cycle
+  *)
   let buildWhileStmt _guard _incr _body = 
     let guard:expr = 
       Option.value _guard ~default:(BLiteral true @> dummy_pos) in
@@ -133,7 +145,9 @@ statement:
             |Some e ->join_stmts (Expr e @> $loc(e1)) whileStmt
         }
   | FOR LPAREN d=varDecl SEMI e2=expr? SEMI e3=expr? RPAREN s=statement
-      { (*desugaring of for statement into while*)
+      { (*desugaring of for statement into while
+        the declaration and the whilestmt are put into a block,
+        limiting the scope of the declared variable*)
         let whileStmt = buildWhileStmt e2 e3 s in
         let list = [Localdec d @> $loc(d); Stmt whileStmt @> $loc(s)] in 
         Block list @> $loc
@@ -164,6 +178,8 @@ rExpr:
   |e1=expr op=bin_op e2=expr {BinaryOp(op, e1, e2) @> $loc}
   |le=lExpr ASSIGN v=expr {Assign(le, v) @> $loc}
   |le=lExpr op=trasforming_assign  e=expr %prec ASSIGN
+    (*Desugaring of +=, -=, *=, etc 
+     x += 1 becomes x += x+1*)
     {let v = BinaryOp(op, (Access(le)@>$loc(le)), e) @> $loc in
       Assign(le, v) @> $loc}
   |e=lExpr INCR {PostIncr e @> $loc}

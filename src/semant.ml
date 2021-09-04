@@ -8,6 +8,9 @@ open Symbol_table
 type funSignature = typ list * typ
 type enviroment = typ t * funSignature t
 
+(*Cheks if a rvalue of type t2 can be 
+  assigned to a lvalue of type t1.
+Used both in variable declaration and function call*)
 let compatible t1 t2 = match t1, t2 with
     |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
     |_ -> t1 = t2 
@@ -186,24 +189,21 @@ and checkBlock (varT, funT) stmtList returnT=
   )        
 
 
-  
-
-  
-
 let checkFun loc env {typ; fname; formals; body}=
   let (varT, funT) = env in
-  let checkReturnT = function 
-      |TypP _
-      |TypA _ -> Util.raise_semantic_error loc "Invalid return type"
-      |_ -> ()
-  in
+    let checkReturnT = function 
+        |TypP _
+        |TypA _ -> Util.raise_semantic_error loc "Invalid return type"
+        |_ -> ()
+    in  checkReturnT typ;
     let formalsEnv =  
       let initialEnv = (begin_block varT, begin_block funT) in
       let addFormal env (t, id) = addVar loc env (t, id, None) in
       List.fold_left addFormal initialEnv formals
     in 
-    checkReturnT typ;
     match body with 
+      (*return type "typ" is passed to checkblock and checkstmt
+        in order to check correctness of the return statement*)
       |{loc; node=Block l} -> checkBlock formalsEnv l typ 
       |_ -> failwith "Illegal AST: function body must be a block"
     (*here the end_block operation is omitted since the 
@@ -217,11 +217,12 @@ let addFun loc env ({typ; fname; formals; body} as f) =
         (varT, add_entry fname sign funT)
       with DuplicateEntry -> 
         Util.raise_semantic_error loc ("Already declared function: "^fname)
-    (*Checks the function in the updated enviroment, 
+      (*Checks the function in the updated enviroment, 
       in order to allow recursive definitions*)
-      in checkFun loc newEnv f; newEnv
+      in checkFun loc newEnv f; 
+        newEnv
 
-let globalSymbolTable = 
+let globalSymbolTable:enviroment = 
   let varTable = empty_table in
   let funTable = 
       empty_table |>

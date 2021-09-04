@@ -107,6 +107,7 @@ let rec buildExpr env builder {loc; node;} =
   | BinaryOp(op, e1, e2) -> 
       buildBinOp env builder op e1 e2
   | Call(id, args)       -> 
+      (*array_decay is applied on expressions*)
       let array_decay = function
         |{loc; node=SLiteral s} as e -> 
             buildExpr env builder e
@@ -250,7 +251,7 @@ let buildFunction ({typ; fname; formals; body;} as f) =
     (match body.node with 
       |Block l -> buildBlock actualsEnv builder d l  
       |_ -> failwith "Illegal AST: function body must be a block");
-    match typ with
+    match typ with 
       |TypV -> ifNoTerminator
                 (L.build_ret_void) builder
       |_ -> ()

@@ -18,15 +18,22 @@ void printString(char s[]){
         print_char(s[i++]);
 }
 
+int foo(){
+    int x =0;
+    x++;
+    return 0;
+}
+
 int main(){  
-    /*char s[] = "ciao bello";
+    char t[] = "ciao bello";
     for(int i= 0; i<10; i++)
-        print_char(s[i]);*/
+        print_char(t[i]);
     int arr[15];
     arr[2] = 17;
     sort(arr, 15); 
     char s[] = "ciao \n bello";
     printString(s);
+    //printString("bonjour");
     //for(int i = 0; i<15; i++)
       //  print(arr[i]);  
     return 0;
