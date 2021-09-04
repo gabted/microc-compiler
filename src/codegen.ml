@@ -180,6 +180,8 @@ let ifNoTerminator buildTerminator builder=
     else ()
 
 let rec buildStmt env builder fundef {loc; node;} =
+  (*Instruction after return are ignored*)
+  if Option.is_none (L.block_terminator (L.insertion_block builder)) then
   match node with
   | Block list      -> buildBlock env builder fundef list
   | Expr e          -> buildExpr env builder e |> ignore           
