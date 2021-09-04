@@ -24,6 +24,10 @@ let rec ltype_of_typ = function
     |None   -> L.pointer_type (ltype_of_typ t) (*Clang implementation*)
     |Some n -> L.array_type (ltype_of_typ t) n
 
+let decayed_ltype_of_typ = function
+  |TypA(t, _) -> L.pointer_type (ltype_of_typ t)
+  |t -> ltype_of_typ t
+
 let declareLibraryFuns = 
   let print_t = L.function_type void_t [|int_t|] in
   L.declare_function "print" print_t theModule |> ignore;
@@ -35,7 +39,7 @@ let declareLibraryFuns =
 let declareFun {typ; fname; formals; body;} = 
   let returnT = ltype_of_typ typ in
   let formalsT = Array.of_list(
-    List.map (fun (t, id) -> ltype_of_typ t) formals
+    List.map (fun (t, id) ->decayed_ltype_of_typ t) formals
     ) in
   let funT = L.function_type returnT formalsT in
   L.define_function fname funT theModule 
@@ -49,7 +53,7 @@ let declareGlobalVar {loc; node=(t, id, _)} =
 the actual parameters in it*)
 let allocateParams builder env (t, id) v = 
   L.set_value_name id v;
-  let ltype = ltype_of_typ t in
+  let ltype = decayed_ltype_of_typ t in
   let addr = L.build_alloca ltype (id^"_addr") builder in
   let _ = L.build_store v addr builder in
   add_entry id addr env
@@ -119,8 +123,9 @@ let rec buildExpr env builder {loc; node;} =
   | Call(id, args)       -> 
       (*array_decay is applied on expressions*)
       let array_decay = function
-        |{loc; node=SLiteral s} as e -> 
-            buildExpr env builder e
+        |{loc; node=SLiteral s} -> 
+            let addr = L.build_global_string s "const_str" builder in 
+            L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
         |{loc; node=Access a} -> 
           let addr = buildAcc env builder a in
           if isArray addr then 

@@ -1,16 +1,15 @@
 
-void print_string(char s[]){
-    for(int i = 0; s[i] != '\0'; i++)
+void prints() {
+    char s[] = "hello world";
+    int i;
+    for(i = 0; s[i] != '\0'; i++)
         print_char(s[i]);
 }
 
-void main(){
-    char c = '\0';
-    char s[] = "hello\0 world";
+int main() {
+    int i;
 
-    for(int i = 0; s[i] != '\0'; i++)
-        print_char(s[i]);
+    prints();
 
-
-    //print_string(c);
+    return 0;
 }

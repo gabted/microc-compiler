@@ -11,8 +11,13 @@ type enviroment = typ t * funSignature t
 (*Cheks if a rvalue of type t2 can be 
   assigned to a lvalue of type t1.
 Used both in variable declaration and function call*)
-let compatible t1 t2 = match t1, t2 with
+let declaration_compatible t1 t2 = match t1, t2 with
     |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
+    |TypP(_), TypNullP -> true
+    |_ -> t1 = t2 
+
+let call_compatible t1 t2 = match t1, t2 with
+    |TypA(_t1, _), TypA(_t2, _) -> _t1=_t2
     |TypP(_), TypNullP -> true
     |_ -> t1 = t2 
 
@@ -48,7 +53,7 @@ let rec typeOf env {loc; node;} =
         (match (tL, tR) with
           |TypA _ ,_  -> Util.raise_semantic_error loc 
             "Cannot assign an array"
-          |tL, tR when not(compatible tL tR) -> Util.raise_semantic_error loc
+          |tL, tR when not(declaration_compatible tL tR) -> Util.raise_semantic_error loc
             "lhs and rhs type discrepancy"  
           |tL, tR -> tL
         )
@@ -77,7 +82,7 @@ let rec typeOf env {loc; node;} =
                 ("Undeclared function "^id)
           |Some(formalTypes, t) -> 
               let actualTypes =  List.map (typeOf env) args in
-              if List.equal compatible formalTypes actualTypes 
+              if List.equal call_compatible formalTypes actualTypes 
                 then t
                 else Util.raise_semantic_error loc 
                   "Invalid actual parameters types"
@@ -116,7 +121,7 @@ let checkVarType loc t =
 let addVar loc (env:enviroment) (t, id, v)  = 
   checkVarType loc t;
   if Option.is_some v && 
-    not(compatible t (typeOf env (Option.get v))) then
+    not(declaration_compatible t (typeOf env (Option.get v))) then
     Util.raise_semantic_error loc "Initializer expression of the wrong type"
   else
     try
