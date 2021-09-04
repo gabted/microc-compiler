@@ -214,7 +214,7 @@ aExpr:
   |s=LSTRING  {SLiteral s @> $loc}
   |TRUE       {BLiteral true @> $loc}
   |FALSE      {BLiteral false @> $loc}
-  |NULL       {ILiteral 0 @> $loc}
+  |NULL       {NullLiteral @> $loc}
   |LPAREN e=rExpr RPAREN {e}
   |REF e=lExpr {Addr e @> $loc}
 

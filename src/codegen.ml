@@ -18,6 +18,7 @@ let rec ltype_of_typ = function
   | TypB -> bool_t
   | TypC -> char_t
   | TypV -> void_t
+  | TypNullP -> L.pointer_type( int_t)
   | TypP t -> L.pointer_type (ltype_of_typ t)
   | TypA (t, d) -> match d with
     |None   -> L.pointer_type (ltype_of_typ t) (*Clang implementation*)
@@ -66,6 +67,7 @@ let rec buildExpr env builder {loc; node;} =
   | BLiteral b           -> L.const_int bool_t (Bool.to_int b)   
   | SLiteral s           -> let global = L.build_global_string s "const_str" builder 
                             in L.build_load global "temp" builder  
+  | NullLiteral          -> L.const_null (L.pointer_type int_t)
   | Access a             ->  
     (*here a is used as a R-value, so it must be loaded*)
     let addr = buildAcc env builder a in

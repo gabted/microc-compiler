@@ -19,6 +19,7 @@ type typ =
   | TypC                             (* Type char                   *)
   | TypA of typ * int option         (* Array type                  *)
   | TypP of typ                      (* Pointer type                *)
+  | TypNullP                         (* NullPointer type                *)
   | TypV                             (* Type void                   *)
   [@@deriving show]
 
@@ -35,6 +36,7 @@ and expr_node =
   | CLiteral of char                 (* Char literal                *)
   | BLiteral of bool                 (* Bool literal                *)
   | SLiteral of string               (* String literal              *)
+  | NullLiteral                      (* NULL *)
   | UnaryOp of uop * expr            (* Unary primitive operator    *)
   | BinaryOp of binop * expr * expr  (* Binary primitive operator   *)
   | Call of identifier * expr list   (* Function call f(...)        *)

@@ -13,6 +13,7 @@ type enviroment = typ t * funSignature t
 Used both in variable declaration and function call*)
 let compatible t1 t2 = match t1, t2 with
     |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
+    |TypP(_), TypNullP -> true
     |_ -> t1 = t2 
 
 let rec typeOf env {loc; node;} =
@@ -20,6 +21,7 @@ let rec typeOf env {loc; node;} =
     | ILiteral n           -> TypI        
     | CLiteral c           -> TypC       
     | BLiteral b           -> TypB  
+    | NullLiteral          -> TypNullP
     | SLiteral s           -> TypA(TypC, Some((String.length s)+1))   
     | Access a             -> typeOfAcc env a               
     | Addr a               -> TypP(typeOfAcc env a)     
@@ -27,7 +29,7 @@ let rec typeOf env {loc; node;} =
         (match (typeOfAcc env a, typeOf env e) with
           |TypA _ ,_  -> Util.raise_semantic_error loc 
             "Cannot assign an array"
-          |tL, tR when tL <> tR -> Util.raise_semantic_error loc
+          |tL, tR when not(compatible tL tR) -> Util.raise_semantic_error loc
             "lhs and rhs type discrepancy"  
           |tL, tR -> tL)
     | PostIncr a 
@@ -62,6 +64,7 @@ let rec typeOf env {loc; node;} =
         |Geq, TypI, TypI     -> TypB
         |And, TypB, TypB
         |Or, TypB, TypB     -> TypB
+        |Equal, TypP _, TypNullP -> TypB
         |_ -> Util.raise_semantic_error loc 
             "Incorrect operand types"
     )
