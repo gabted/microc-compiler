@@ -160,6 +160,7 @@ let rec buildExpr env builder {loc; node;} =
   | BinaryOp(op, e1, e2) -> 
       let v1 = buildExpr env builder e1 in 
       let v2 = buildExpr env builder e2 in 
+      let v2 = castIfNull v2 (L.type_of v1) builder in
       buildBinOp env builder op v1 v2
   | Call(id, args)       -> 
       buildCall env builder id args
@@ -201,7 +202,6 @@ and buildBinOp env builder op v1 v2 =
     |And      -> L.build_and v1 v2 "and_result" builder
     |Or       -> L.build_or v1 v2 "or_result" builder
 and buildDoubleBinOp env builder op v1 v2 =
-  let v2 = castIfNull v2 (L.type_of v1) builder in
   let v1 = castIfCoercion v2 double_t builder in
   let v2 = castIfCoercion v1 double_t builder in
   match op with
