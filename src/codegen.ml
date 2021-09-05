@@ -6,6 +6,7 @@ module L = Llvm
 let theContext = L.global_context()
 let theModule = L.create_module theContext "main_module"
 let int_t  = L.i32_type  theContext
+and double_t = L.double_type theContext
 and char_t = L.i8_type theContext
 and bool_t = L.i1_type theContext
 and void_t = L.void_type theContext
@@ -13,13 +14,9 @@ and void_t = L.void_type theContext
 let c_zero = L.const_int int_t 0
 let c_one  = L.const_int int_t 1
 
-let isNull v =
-  match L.classify_value v with
-    |L.ValueKind.ConstantPointerNull -> true
-    |_ -> false 
-
 let rec ltype_of_typ = function
     TypI -> int_t
+  | TypD -> double_t
   | TypB -> bool_t
   | TypC -> char_t
   | TypV -> void_t
@@ -39,7 +36,9 @@ let declareLibraryFuns =
   let printChar_t = L.function_type void_t [|char_t|] in
   L.declare_function "print_char" printChar_t theModule |> ignore;
   let getint_t = L.function_type int_t [||] in
-  L.declare_function "getint" getint_t theModule
+  L.declare_function "getint" getint_t theModule |> ignore;
+  let printDouble_t = L.function_type void_t [|double_t|] in
+  L.declare_function "print_double" printDouble_t theModule
 
 let declareFun {typ; fname; formals; body;} = 
   let returnT = ltype_of_typ typ in
@@ -53,7 +52,8 @@ let declareGlobalVar {loc; node=(t, id, v)} =
   let init =  match v with
     |None -> L.const_null (ltype_of_typ t) 
     |Some {loc; node=n} -> (match n with
-      | ILiteral n       -> L.const_int int_t n     
+      | ILiteral n       -> L.const_int int_t n   
+      | DLiteral n       -> L.const_float double_t n  
       | CLiteral c       -> L.const_int char_t (Char.code c) 
       | BLiteral b       -> L.const_int bool_t (Bool.to_int b)   
       | SLiteral s       -> L.const_stringz theContext s
@@ -74,15 +74,37 @@ let allocateParams builder env (t, id) v =
   let _ = L.build_store v addr builder in
   add_entry id addr env
 
+let isNull v =
+  match L.classify_value v with
+    |L.ValueKind.ConstantPointerNull -> true
+    |_ -> false 
 
 let isArray v = 
   match L.classify_type (L.element_type(L.type_of v)) with
   |L.TypeKind.Array -> true
   |_ -> false
 
+let castIfNull value t builder = 
+  if isNull value
+    then 
+      L.build_inttoptr value t "cast" builder
+    else
+      value
+
+let castIfCoercion value t builder =
+  let tFrom = L.classify_type (L.type_of value) in
+  let tTo = L.classify_type t in
+  match (tFrom, tTo) with
+  |(L.TypeKind.Integer, L.TypeKind.Double) ->
+    L.build_sitofp value double_t "conv" builder
+  |(L.TypeKind.Double, L.TypeKind.Integer) ->
+    L.build_fptosi value int_t "conv" builder
+  |_ -> value
+
 let rec buildExpr env builder {loc; node;} = 
   match node with
   | ILiteral n           -> L.const_int int_t n     
+  | DLiteral n           -> L.const_float double_t n
   | CLiteral c           -> L.const_int char_t (Char.code c) 
   | BLiteral b           -> L.const_int bool_t (Bool.to_int b)   
   | SLiteral s           -> let global = L.build_global_string s "const_str" builder 
@@ -97,22 +119,18 @@ let rec buildExpr env builder {loc; node;} =
     buildAcc env builder a
   | Assign(a, e, _op)         -> 
       let addr = buildAcc env builder a in
-      let expr_value = buildExpr env builder e in
+      let addrT = L.type_of addr in
+      let value = buildExpr env builder e in
       let value = match _op with
-        None -> expr_value
+         None -> value
         |Some(op) -> 
           let oldV =  L.build_load addr "" builder in 
-          buildBinOp env builder op oldV expr_value
+          buildBinOp env builder op oldV value
       in
-      if isNull value
-        then 
-          let destT = L.element_type (L.type_of addr) in
-          let cast = L.build_inttoptr value destT "cast" builder in
-          L.build_store cast addr builder |> ignore;
-          cast
-        else
-          (L.build_store value addr builder |> ignore;
-          value)
+      let value = castIfNull value addrT builder in
+      let value = castIfCoercion value addrT builder in
+      L.build_store value addr builder |> ignore;
+      value
   | PostIncr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
                   let newV = L.build_add oldV c_one "incr" builder in
@@ -140,36 +158,12 @@ let rec buildExpr env builder {loc; node;} =
       |Not -> L.build_not v "not_result" builder   
       )      
   | BinaryOp(op, e1, e2) -> 
-    let v1 = buildExpr env builder e1 in 
-    let v2 = buildExpr env builder e2 in 
-    let v2 = if isNull v2
-      then L.build_ptrtoint v2 (L.type_of v1) "cast" builder
-      else v2 in
-    buildBinOp env builder op v1 v2
+      let v1 = buildExpr env builder e1 in 
+      let v2 = buildExpr env builder e2 in 
+      buildBinOp env builder op v1 v2
   | Call(id, args)       -> 
-      (*array_decay is applied on expressions*)
-      let array_decay = function
-        |{loc; node=SLiteral s} -> 
-            let addr = L.build_global_string s "const_str" builder in 
-            L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
-        |{loc; node=Access a} -> 
-          let addr = buildAcc env builder a in
-          if isArray addr then 
-            L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
-          else
-            L.build_load addr "" builder
-        |e -> buildExpr env builder e in
-      let actuals = List.map array_decay args in
-      let f = L.lookup_function id theModule |> Option.get in
-      let formals = L.params f |> Array.to_list in
-      let actuals = List.fold_left2 (
-        fun acc actual formal -> 
-          let actual = if isNull actual 
-            then L.build_inttoptr actual (L.type_of formal) "cast" builder
-            else actual in
-            acc @ [actual]
-      ) [] actuals formals in 
-      L.build_call f (Array.of_list actuals) "" builder
+      buildCall env builder id args
+      
 and buildAcc env builder {loc; node} =
   match node with
     |AccVar id -> 
@@ -189,20 +183,66 @@ and buildAcc env builder {loc; node} =
         L.build_gep first_el [|index|] "elem_addr" builder
       |_ -> failwith "Accessing not an array"
 and buildBinOp env builder op v1 v2 =  
-  match op with 
-  |Add      -> L.build_add v1 v2 "add_result" builder
-  |Sub      -> L.build_sub v1 v2 "sub_result" builder
-  |Mult     -> L.build_mul v1 v2 "mul_result" builder
-  |Div      -> L.build_sdiv v1 v2 "div_result" builder
-  |Mod      -> L.build_srem v1 v2 "rem_result" builder
-  |Equal    -> L.build_icmp Eq v1 v2 "eq_result" builder 
-  |Neq      -> L.build_icmp Ne v1 v2 "neq_result" builder
-  |Less     -> L.build_icmp Slt v1 v2 "less_result" builder
-  |Leq      -> L.build_icmp Sle v1 v2 "leq_result" builder
-  |Greater  -> L.build_icmp Sgt v1 v2 "greater_result" builder
-  |Geq      -> L.build_icmp Sge v1 v2 "geq_result" builder
-  |And      -> L.build_and v1 v2 "and_result" builder
-  |Or       -> L.build_or v1 v2 "or_result" builder
+  if (L.type_of v1 == double_t) || (L.type_of v2 == double_t)
+    then buildDoubleBinOp env builder op v1 v2
+  else
+    match op with 
+    |Add      -> L.build_add v1 v2 "add_result" builder
+    |Sub      -> L.build_sub v1 v2 "sub_result" builder
+    |Mult     -> L.build_mul v1 v2 "mul_result" builder
+    |Div      -> L.build_sdiv v1 v2 "div_result" builder
+    |Mod      -> L.build_srem v1 v2 "rem_result" builder
+    |Equal    -> L.build_icmp Eq v1 v2 "eq_result" builder 
+    |Neq      -> L.build_icmp Ne v1 v2 "neq_result" builder
+    |Less     -> L.build_icmp Slt v1 v2 "less_result" builder
+    |Leq      -> L.build_icmp Sle v1 v2 "leq_result" builder
+    |Greater  -> L.build_icmp Sgt v1 v2 "greater_result" builder
+    |Geq      -> L.build_icmp Sge v1 v2 "geq_result" builder
+    |And      -> L.build_and v1 v2 "and_result" builder
+    |Or       -> L.build_or v1 v2 "or_result" builder
+and buildDoubleBinOp env builder op v1 v2 =
+  let v2 = castIfNull v2 (L.type_of v1) builder in
+  let v1 = castIfCoercion v2 double_t builder in
+  let v2 = castIfCoercion v1 double_t builder in
+  match op with
+  |Add      -> L.build_fadd v1 v2 "add_result" builder
+  |Sub      -> L.build_fsub v1 v2 "sub_result" builder
+  |Mult     -> L.build_fmul v1 v2 "mul_result" builder
+  |Div      -> L.build_fdiv v1 v2 "div_result" builder
+  |Mod      -> L.build_frem v1 v2 "rem_result" builder
+  |Equal    -> L.build_fcmp Oeq v1 v2 "eq_result" builder 
+  |Neq      -> L.build_fcmp One v1 v2 "neq_result" builder
+  |Less     -> L.build_fcmp Olt v1 v2 "less_result" builder
+  |Leq      -> L.build_fcmp Ole v1 v2 "leq_result" builder
+  |Greater  -> L.build_fcmp Ogt v1 v2 "greater_result" builder
+  |Geq      -> L.build_fcmp Oge v1 v2 "geq_result" builder
+  |_        -> failwith "float operand on not arithmetic operation"
+  and buildCall env builder id args = 
+    let build_decayed_expr e = match e with
+      |{loc; node=SLiteral s} -> 
+          let addr = L.build_global_string s "const_str" builder in 
+          L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
+      |{loc; node=Access a} -> 
+        let addr = buildAcc env builder a in
+        if isArray addr then 
+          L.build_gep addr [|c_zero; c_zero|] "array_decay" builder
+        else
+          L.build_load addr "" builder
+      |e -> buildExpr env builder e in
+    let actuals = List.map build_decayed_expr args 
+    in
+    let f = L.lookup_function id theModule |> Option.get in
+    let formals = L.params f |> Array.to_list 
+    in let casted_actuals = List.map2 (
+      fun actual formal ->
+        let destT = L.type_of formal in
+        let actual = castIfNull actual destT builder in
+        let actual = castIfCoercion actual destT builder in
+        actual
+    ) actuals formals in
+    L.build_call f (Array.of_list casted_actuals) "" builder
+    
+  
 
 let allocLocalVar env builder {loc; node=(t, id, v)} = 
   match v with
@@ -210,10 +250,8 @@ let allocLocalVar env builder {loc; node=(t, id, v)} =
     L.build_alloca (ltype_of_typ t) id builder
   |Some e ->
     let value = buildExpr env builder e in
-    let value = if isNull value
-        then 
-          L.build_inttoptr value (L.element_type (ltype_of_typ t)) "cast" builder
-        else value in
+    let value = castIfNull value (ltype_of_typ t) builder in
+    let value = castIfCoercion value (ltype_of_typ t) builder in
     let value_t = L.type_of value in
     (*Thanks to semantic cheking, we are sure that value_t
     is a compatible value with t*)

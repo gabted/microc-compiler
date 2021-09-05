@@ -14,30 +14,39 @@ Used both in variable declaration and function call*)
 let declaration_compatible t1 t2 = match t1, t2 with
     |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
     |TypP _, TypNullP -> true
+    |TypD, TypI -> true
+    |TypI, TypD -> true
     |_ -> t1 = t2 
 
 let call_compatible t1 t2 = match t1, t2 with
     |TypA(_t1, _), TypA(_t2, _) -> _t1=_t2
-    |TypP(_), TypNullP -> true
-    |TypNullP, TypP _ -> true
-    |_ -> t1 = t2 
+    |_  -> declaration_compatible t1 t2
 
 let binopTypeConversions op t1 t2 loc = 
   match (op, t1, t2) with
     |(Add|Sub|Mult|Div|Mod), TypI, TypI   -> TypI
+    |(Add|Sub|Mult|Div|Mod), TypD, TypD   -> TypD
+    |(Add|Sub|Mult|Div|Mod), TypD, TypI   -> TypD
+    |(Add|Sub|Mult|Div|Mod), TypI, TypD   -> TypI
     |(Equal|Neq), TypI, TypI
+    |(Equal|Neq), TypD, TypD
+    |(Equal|Neq), TypD, TypI
+    |(Equal|Neq), TypI, TypD
     |(Equal|Neq), TypC, TypC
-    |(Less|Leq|Greater|Geq), TypI, TypI   -> TypB
+    |(Less|Leq|Greater|Geq), TypI, TypI  
+    |(Less|Leq|Greater|Geq), TypD, TypD
+    |(Less|Leq|Greater|Geq), TypD, TypI  
+    |(Less|Leq|Greater|Geq), TypI, TypD  -> TypB
     |(And|Or), TypB, TypB                  -> TypB
     |(Equal|Neq), TypP _, TypNullP -> TypB
-    |(Equal|Neq), TypNullP, TypP _ -> TypB
     |_ -> Util.raise_semantic_error loc 
       "Incorrect operand types"
 
 
 let rec typeOf env {loc; node;} =
   match node with
-    | ILiteral n           -> TypI        
+    | ILiteral n           -> TypI  
+    | DLiteral n           -> TypD      
     | CLiteral c           -> TypC       
     | BLiteral b           -> TypB  
     | NullLiteral          -> TypNullP
@@ -68,6 +77,7 @@ let rec typeOf env {loc; node;} =
     | UnaryOp(op, e)       -> 
         (match (op, typeOf env e) with
         |Neg, TypI -> TypI
+        |Neg, TypD -> TypD
         |Not, TypB -> TypB
         |Neg, _ -> Util.raise_semantic_error loc 
             "- requires int value"
@@ -136,14 +146,15 @@ let addLocalVar env {loc; node=(t, id, v)} =
   addVar loc env (t, id, v)
 
 
-(*The only constant values are Literals and the addres of a 
+(*The only constant values are Literals and the address of a 
 variable*)
   let rec checkConstantExpr v =  
   match v.node with
     | ILiteral _                   
     | CLiteral _            
     | BLiteral _  
-    | SLiteral _        
+    | SLiteral _  
+    | DLiteral _      
     | NullLiteral  -> true 
     | Addr {loc; node=AccVar _} ->  true
     | Addr _ -> false
@@ -252,7 +263,8 @@ let globalSymbolTable:enviroment =
       empty_table |>
       add_entry "print" ([TypI], TypV) |>
       add_entry "print_char" ([TypC], TypV) |>
-      add_entry "getint" ([], TypI)
+      add_entry "getint" ([], TypI) |>
+      add_entry "print_double" ([TypD], TypV)
   in  
   (varTable, funTable)
 

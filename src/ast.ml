@@ -15,11 +15,12 @@ let (@>) node loc = {loc = loc; node = node;}
 
 type typ =
   | TypI                             (* Type int                    *)
+  | TypD                             (* Type double                 *)
   | TypB                             (* Type bool                   *)
   | TypC                             (* Type char                   *)
   | TypA of typ * int option         (* Array type                  *)
   | TypP of typ                      (* Pointer type                *)
-  | TypNullP                         (* NullPointer type                *)
+  | TypNullP                         (* NullPointer type            *)
   | TypV                             (* Type void                   *)
   [@@deriving show]
 
@@ -33,6 +34,7 @@ and expr_node =
   | PreDecr of access                   (* --x  or  --*p  or  --a[e]   *)
   | Addr of access                   (* &x   or  &*p   or  &a[e]    *)
   | ILiteral of int                  (* Integer literal             *)
+  | DLiteral of float                (* Double literal              *)
   | CLiteral of char                 (* Char literal                *)
   | BLiteral of bool                 (* Bool literal                *)
   | SLiteral of string               (* String literal              *)

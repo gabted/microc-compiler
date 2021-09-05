@@ -15,3 +15,7 @@ void print(int n){
 void print_char(char c){
   printf("%c\n", c);
 }
+
+void print_double(double d){
+  printf("%f\n", d);
+}

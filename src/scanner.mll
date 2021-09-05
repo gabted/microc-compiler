@@ -10,7 +10,7 @@
 
 
     let keyword_table =
-    create_hashtable 8 [
+    create_hashtable 14 [
         ("if", IF);
         ("return", RETURN);
         ("else", ELSE);
@@ -18,6 +18,7 @@
         ("while", WHILE);
         ("do", DO);
         ("int", INT);
+        ("double", DOUBLE);
         ("char", CHAR);
         ("void", VOID);
         ("NULL", NULL);
@@ -37,7 +38,14 @@ rule token = parse
     digit+ as inum         { let _num = int_of_string_opt inum in
                                 match _num with
                                 |Some(num) -> LINT(num)
-                                |None -> Util.raise_lexer_error lexbuf (Lexing.lexeme lexbuf ^": Invalid int format")
+                                |None -> Util.raise_lexer_error lexbuf 
+                                        (Lexing.lexeme lexbuf ^": Invalid int format")
+                            }
+    |digit*'.'digit+ as dnum  {let _num = float_of_string_opt dnum in
+                                match _num with
+                                |Some(num) -> LDOUBLE(num)
+                                |None -> Util.raise_lexer_error lexbuf 
+                                        (Lexing.lexeme lexbuf ^": Invalid double format")
                             }
     |"\'\\0\'"                 {LCHAR('\x00')}
     |'\''(ES|['a'-'z' 'A'-'Z' '0' - '9'] as s)'\''    

@@ -55,7 +55,7 @@
 
 /* Tokens declarations */
 %token IF RETURN ELSE FOR WHILE DO
-%token INT CHAR VOID NULL BOOL
+%token INT CHAR VOID NULL BOOL DOUBLE
 %token TRUE FALSE
 %token REF PLUS MINUS TIMES DIV REMINDER 
 %token ASSIGN MUL_ASSIGN DIV_ASSIGN	MOD_ASSIGN ADD_ASSIGN	SUB_ASSIGN
@@ -64,6 +64,7 @@
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET COMMA SEMI
 %token <string>ID
 %token <int>LINT
+%token <float>LDOUBLE
 %token <char>LCHAR
 %token <string>LSTRING
 %token EOF
@@ -210,6 +211,7 @@ aExpr:
   |n=LINT     {ILiteral n @> $loc}
   |c=LCHAR    {CLiteral c @> $loc}
   |s=LSTRING  {SLiteral s @> $loc}
+  |d=LDOUBLE  {DLiteral d @> $loc}
   |TRUE       {BLiteral true @> $loc}
   |FALSE      {BLiteral false @> $loc}
   |NULL       {NullLiteral @> $loc}
@@ -218,6 +220,7 @@ aExpr:
 
 typ:
   | INT          { TypI     }
+  | DOUBLE       { TypD     }
   | BOOL         { TypB     }
   | CHAR         { TypC     }
   | VOID         { TypV     }
