@@ -5,16 +5,16 @@ void foo(int x){
 }
 
 int main(){
-    double x = 1.2345678;
-    double *p = NULL;
+    double x = 1.5;
+    //double *p = NULL;
 
-    if(p == NULL)
-        print(0);
-    else
-        print(1);
+    x += 5;
+    double b = 10;
+    b += .01;
+    b++;
 
-    foo(42);
-
-    print_double(42);
+    
+    print_double(b);
+    print(x);
     return 0;
 }

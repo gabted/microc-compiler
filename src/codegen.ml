@@ -14,6 +14,8 @@ and void_t = L.void_type theContext
 let c_zero = L.const_int int_t 0
 let c_one  = L.const_int int_t 1
 
+let cf_one = L.const_float double_t 1.0
+
 let rec ltype_of_typ = function
     TypI -> int_t
   | TypD -> double_t
@@ -74,10 +76,6 @@ let allocateParams builder env (t, id) v =
   let _ = L.build_store v addr builder in
   add_entry id addr env
 
-let isNull v =
-  match L.classify_value v with
-    |L.ValueKind.ConstantPointerNull -> true
-    |_ -> false 
 
 let isArray v = 
   match L.classify_type (L.element_type(L.type_of v)) with
@@ -85,11 +83,11 @@ let isArray v =
   |_ -> false
 
 let castIfNull value t builder = 
-  if isNull value
-    then 
+  match L.classify_value value with
+    |L.ValueKind.ConstantPointerNull ->
       L.build_inttoptr value t "cast" builder
-    else
-      value
+    |_ -> value
+
 
 let castIfCoercion value t builder =
   let tFrom = L.classify_type (L.type_of value) in
@@ -119,7 +117,7 @@ let rec buildExpr env builder {loc; node;} =
     buildAcc env builder a
   | Assign(a, e, _op)         -> 
       let addr = buildAcc env builder a in
-      let addrT = L.type_of addr in
+      let destT = L.element_type(L.type_of addr) in
       let value = buildExpr env builder e in
       let value = match _op with
          None -> value
@@ -127,28 +125,28 @@ let rec buildExpr env builder {loc; node;} =
           let oldV =  L.build_load addr "" builder in 
           buildBinOp env builder op oldV value
       in
-      let value = castIfNull value addrT builder in
-      let value = castIfCoercion value addrT builder in
+      let value = castIfNull value destT builder in
+      let value = castIfCoercion value destT builder in
       L.build_store value addr builder |> ignore;
       value
   | PostIncr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
-                  let newV = L.build_add oldV c_one "incr" builder in
+                  let newV = buildBinOp env builder Add oldV c_one in
                   L.build_store newV addr builder |> ignore;
                   oldV
   | PostDecr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
-                  let newV = L.build_sub oldV c_one "incr" builder in
+                  let newV = buildBinOp env builder Sub oldV c_one in
                   L.build_store newV addr builder |> ignore;
                   oldV
   | PreIncr  a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
-                  let newV = L.build_add oldV c_one "incr" builder in
+                  let newV = buildBinOp env builder Add oldV c_one in
                   L.build_store newV addr builder |> ignore;
                   newV
   | PreDecr  a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
-                  let newV = L.build_sub oldV c_one "incr" builder in
+                  let newV = buildBinOp env builder Sub oldV c_one in
                   L.build_store newV addr builder |> ignore;
                   newV
   | UnaryOp(op, e)       -> 
@@ -202,8 +200,8 @@ and buildBinOp env builder op v1 v2 =
     |And      -> L.build_and v1 v2 "and_result" builder
     |Or       -> L.build_or v1 v2 "or_result" builder
 and buildDoubleBinOp env builder op v1 v2 =
-  let v1 = castIfCoercion v2 double_t builder in
-  let v2 = castIfCoercion v1 double_t builder in
+  let v1 = castIfCoercion v1 double_t builder in
+  let v2 = castIfCoercion v2 double_t builder in
   match op with
   |Add      -> L.build_fadd v1 v2 "add_result" builder
   |Sub      -> L.build_fsub v1 v2 "sub_result" builder

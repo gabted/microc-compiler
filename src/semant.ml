@@ -71,9 +71,12 @@ let rec typeOf env {loc; node;} =
     | PostIncr a 
     | PostDecr a 
     | PreIncr  a 
-    | PreDecr  a -> if typeOfAcc env a = TypI then TypI
-                    else Util.raise_semantic_error loc 
-                    "increment must be applied to numeric lvalues"
+    | PreDecr  a -> (match typeOfAcc env a with
+          |TypI -> TypI
+          |TypD -> TypD
+          |_ -> Util.raise_semantic_error loc 
+                "increment must be applied to numeric lvalues"
+          )
     | UnaryOp(op, e)       -> 
         (match (op, typeOf env e) with
         |Neg, TypI -> TypI
