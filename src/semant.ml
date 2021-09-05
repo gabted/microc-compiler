@@ -201,7 +201,7 @@ let rec checkStmt env {loc; node;} returnT=
 
 and checkBlock (varT, funT) stmtList returnT=
   ignore( 
-    let initialEnv = (begin_block varT, begin_block funT) in
+    let initialEnv = (begin_block varT, funT) in
     List.fold_left (
       fun env node -> match node with
         |{loc; node=Localdec d;} -> addLocalVar env d
@@ -235,7 +235,7 @@ let checkFun loc env {typ; fname; formals; body}=
       else Util.raise_semantic_error loc "Multidimensional array must specify inner sizes"
     in checkMultiArrayT ;
     let formalsEnv =  
-      let initialEnv = (begin_block varT, begin_block funT) in
+      let initialEnv = (begin_block varT, funT) in
       let addFormal env (t, id) = addVar loc env (t, id, None) in
       List.fold_left addFormal initialEnv formals
     in 

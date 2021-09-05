@@ -95,13 +95,13 @@ rule token = parse
     | '\n'                   { Lexing.new_line lexbuf; token lexbuf }
     | "//"[^ '\n']*'\n'{ Lexing.new_line lexbuf; token lexbuf }
     | "/*"                   {multi_comment lexbuf;}
-    | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ Char.escaped c) }
+    | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ (String.make 1 c)) }
 
 and string_parser sequence = parse
     |'\"'                                     
         {let s = String.of_seq sequence in
         LSTRING(s)}
-    |['a'-'z' 'A'-'Z' '0' - '9' ' ' '\t'] as c          
+    |[^ '\\' '\n' '\"' '\''] as c 
         {let new_seq = Seq.append sequence (Seq.return c) in
           string_parser new_seq lexbuf}
     |ES as s                                  
@@ -118,7 +118,7 @@ and string_parser sequence = parse
     |eof                              
         {Util.raise_lexer_error lexbuf ("Non terminated string")}
     |_ as c 
-        {Util.raise_lexer_error lexbuf ("Illegal character whil parsing string" ^ Char.escaped c)}
+        {Util.raise_lexer_error lexbuf ("Illegal character while parsing string: " ^(String.make 1 c))}
 
 
 

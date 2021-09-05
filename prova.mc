@@ -1,20 +1,18 @@
-double y = .1111111;
+double a[][10];
+double (*p)[][10] = &a;
 
-void foo(int x){
-    print(x);
+void printmatrix(int n){
+    for(int i = 0; i<n; i++)
+        for(int j=0; j<10; j++)
+            print(a[i][j]);
 }
 
-int main(){
-    double x = 1.5;
-    //double *p = NULL;
-
-    x += 5;
-    double b = 10;
-    b += .01;
-    b++;
-
+void main(){
+    char s[]= "ciao   
+     bel\\lo";
+    for(int i = 0; i<5; i++)
+        for(int j=0; j<10; j++)
+            (*p)[i][j] = (i+1)*(j+1);
     
-    print_double(b);
-    print(x);
-    return 0;
+    printmatrix(5);
 }

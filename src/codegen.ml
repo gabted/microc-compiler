@@ -14,8 +14,6 @@ and void_t = L.void_type theContext
 let c_zero = L.const_int int_t 0
 let c_one  = L.const_int int_t 1
 
-let cf_one = L.const_float double_t 1.0
-
 let rec ltype_of_typ = function
     TypI -> int_t
   | TypD -> double_t
@@ -263,23 +261,27 @@ let ifNoTerminator buildTerminator builder=
   if Option.is_none (L.block_terminator block) 
     then buildTerminator builder |> ignore
     else ()
+    
 
-let rec buildStmt env builder fundef {loc; node;} =
+
+let rec buildStmt env builder {loc; node;} =
+  let currentBlock = L.insertion_block builder in
+  let currentFun = L.block_parent currentBlock in
   (*Instruction after return are ignored*)
-  if Option.is_none (L.block_terminator (L.insertion_block builder)) then
+  if Option.is_none (L.block_terminator currentBlock) then
   match node with
-  | Block list      -> buildBlock env builder fundef list
+  | Block list      -> buildBlock env builder list
   | Expr e          -> buildExpr env builder e |> ignore           
   | If(e, s1, s2)   -> 
       let guard = buildExpr env builder e in
-      let thenBlock = L.append_block theContext "then" fundef in
-      let elseBlock = L.append_block theContext "else" fundef in
-      let mergeBlock = L.append_block theContext "merge" fundef in
+      let thenBlock = L.append_block theContext "then" currentFun in
+      let elseBlock = L.append_block theContext "else" currentFun in
+      let mergeBlock = L.append_block theContext "merge" currentFun in
         L.build_cond_br guard thenBlock elseBlock builder |> ignore;
         L.position_at_end thenBlock builder;
-          buildStmt env builder fundef s1 |> ignore;
+          buildStmt env builder s1 |> ignore;
         L.position_at_end elseBlock builder;
-          buildStmt env builder fundef s2 |> ignore;
+          buildStmt env builder s2 |> ignore;
         (match (L.block_terminator thenBlock, 
               L.block_terminator elseBlock) 
          with
@@ -299,15 +301,15 @@ let rec buildStmt env builder fundef {loc; node;} =
             L.position_at_end mergeBlock builder
           |Some _, Some _ -> L.delete_block mergeBlock)
   | While(e, s)     -> 
-    let guardBlock = L.append_block theContext "guard" fundef in
-    let loopBlock = L.append_block theContext "loop" fundef in
-    let contBlock = L.append_block theContext "continuation" fundef in
+    let guardBlock = L.append_block theContext "guard" currentFun in
+    let loopBlock = L.append_block theContext "loop" currentFun in
+    let contBlock = L.append_block theContext "continuation" currentFun in
       L.build_br guardBlock builder |> ignore;
       L.position_at_end guardBlock builder;
         let guard = buildExpr env builder e in
         L.build_cond_br guard loopBlock contBlock builder |> ignore;
       L.position_at_end loopBlock builder;
-        buildStmt env builder fundef s;
+        buildStmt env builder s;
         ifNoTerminator 
           (L.build_br guardBlock) builder;
       L.position_at_end contBlock builder
@@ -317,7 +319,7 @@ let rec buildStmt env builder fundef {loc; node;} =
       else 
         let v = buildExpr env builder (Option.get eOpt) in
         L.build_ret v builder |> ignore
-and buildBlock env builder fundef l = 
+and buildBlock env builder l = 
   let blockEnv = env |> begin_block in
     List.fold_left (
       fun env n -> match n.node with
@@ -326,7 +328,7 @@ and buildBlock env builder fundef l =
           let address = allocLocalVar env builder d in
             add_entry id address env
       |Stmt s     -> 
-          buildStmt env builder fundef s; env
+          buildStmt env builder s; env
     ) blockEnv l 
   |> ignore
 
@@ -338,12 +340,12 @@ let buildFunction ({typ; fname; formals; body;} as f) =
       (allocateParams builder) empty_table formals actuals
     in
     (match body.node with 
-      |Block l -> buildBlock actualsEnv builder d l  
+      |Block l -> buildBlock actualsEnv builder l  
       |_ -> failwith "Illegal AST: function body must be a block");
-    match typ with 
-      |TypV -> ifNoTerminator
-                (L.build_ret_void) builder
-      |_ -> ()
+    if Option.is_none (L.block_terminator (L.insertion_block builder)) 
+      then match typ with 
+      |TypV -> L.build_ret_void builder |> ignore
+      |_ -> (Util.raise_semantic_error dummy_pos "missing return statement")
   
 
 let to_ir (Prog(topdecls)) : L.llmodule =
