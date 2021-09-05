@@ -20,10 +20,10 @@
     builds the correct (type, id) pair*)
     let rec buildTypeIdPair t = function 
       |Id s            -> (t, s) 
-      | Pointer d      -> let t1, s = buildTypeIdPair t d in
-                              (TypP t1, s)
-      | Array(d, n) -> let t1, s = buildTypeIdPair t d in
-                              (TypA(t1, n), s)
+      | Pointer d      -> 
+                    buildTypeIdPair (TypP t) d
+      | Array(d, n) -> 
+                    buildTypeIdPair (TypA(t, n)) d
 
   (* Given two annotated statements s1, s2,
     builds a an annotated block, conceptually equivalent to
@@ -110,7 +110,7 @@ varDecl:
 
 varDesc:
   |id=ID  {Id id}
-  |TIMES d=varDesc  {Pointer d}
+  |TIMES d=varDesc {Pointer d}
   |LPAREN d=varDesc RPAREN {d}
   |d=varDesc LBRACKET RBRACKET {Array(d, None)}
   |d=varDesc LBRACKET n=LINT RBRACKET {Array(d, Some n)}

@@ -13,15 +13,20 @@ and void_t = L.void_type theContext
 let c_zero = L.const_int int_t 0
 let c_one  = L.const_int int_t 1
 
+let isNull v =
+  match L.classify_value v with
+    |L.ValueKind.ConstantPointerNull -> true
+    |_ -> false 
+
 let rec ltype_of_typ = function
     TypI -> int_t
   | TypB -> bool_t
   | TypC -> char_t
   | TypV -> void_t
-  | TypNullP -> L.pointer_type( int_t)
+  | TypNullP -> int_t
   | TypP t -> L.pointer_type (ltype_of_typ t)
   | TypA (t, d) -> match d with
-    |None   -> L.pointer_type (ltype_of_typ t) (*Clang implementation*)
+    |None   -> L.array_type (ltype_of_typ t) 0 (*Clang implementation*)
     |Some n -> L.array_type (ltype_of_typ t) n
 
 let decayed_ltype_of_typ = function
@@ -71,7 +76,7 @@ let rec buildExpr env builder {loc; node;} =
   | BLiteral b           -> L.const_int bool_t (Bool.to_int b)   
   | SLiteral s           -> let global = L.build_global_string s "const_str" builder 
                             in L.build_load global "temp" builder  
-  | NullLiteral          -> L.const_null (L.pointer_type int_t)
+  | NullLiteral          -> L.const_pointer_null int_t
   | Access a             ->  
     (*here a is used as a R-value, so it must be loaded*)
     let addr = buildAcc env builder a in
@@ -88,8 +93,15 @@ let rec buildExpr env builder {loc; node;} =
           let oldV =  L.build_load addr "" builder in 
           buildBinOp env builder op oldV expr_value
       in
-      L.build_store value addr builder |> ignore;
-      value
+      if isNull value
+        then 
+          let destT = L.element_type (L.type_of addr) in
+          let cast = L.build_inttoptr value destT "cast" builder in
+          L.build_store cast addr builder |> ignore;
+          cast
+        else
+          (L.build_store value addr builder |> ignore;
+          value)
   | PostIncr a -> let addr = buildAcc env builder a in
                   let oldV =  L.build_load addr "" builder in
                   let newV = L.build_add oldV c_one "incr" builder in
@@ -119,6 +131,9 @@ let rec buildExpr env builder {loc; node;} =
   | BinaryOp(op, e1, e2) -> 
     let v1 = buildExpr env builder e1 in 
     let v2 = buildExpr env builder e2 in 
+    let v2 = if isNull v2
+      then L.build_ptrtoint v2 (L.type_of v1) "cast" builder
+      else v2 in
     buildBinOp env builder op v1 v2
   | Call(id, args)       -> 
       (*array_decay is applied on expressions*)
@@ -133,9 +148,17 @@ let rec buildExpr env builder {loc; node;} =
           else
             L.build_load addr "" builder
         |e -> buildExpr env builder e in
-      let actuals = List.map array_decay args |> Array.of_list in
+      let actuals = List.map array_decay args in
       let f = L.lookup_function id theModule |> Option.get in
-      L.build_call f actuals "" builder
+      let formals = L.params f |> Array.to_list in
+      let actuals = List.fold_left2 (
+        fun acc actual formal -> 
+          let actual = if isNull actual 
+            then L.build_inttoptr actual (L.type_of formal) "cast" builder
+            else actual in
+            acc @ [actual]
+      ) [] actuals formals in 
+      L.build_call f (Array.of_list actuals) "" builder
 and buildAcc env builder {loc; node} =
   match node with
     |AccVar id -> 
@@ -176,6 +199,10 @@ let allocLocalVar env builder {loc; node=(t, id, v)} =
     L.build_alloca (ltype_of_typ t) id builder
   |Some e ->
     let value = buildExpr env builder e in
+    let value = if isNull value
+        then 
+          L.build_inttoptr value (L.element_type (ltype_of_typ t)) "cast" builder
+        else value in
     let value_t = L.type_of value in
     (*Thanks to semantic cheking, we are sure that value_t
     is a compatible value with t*)
@@ -280,4 +307,15 @@ let to_ir (Prog(topdecls)) : L.llmodule =
     |Globaldec d    ->  declareGlobalVar d |> ignore
     |Fundecl f      ->  buildFunction f
   ) topdecls;
+  (*let n = L.const_pointer_null int_t in
+  let s = match L.classify_value n with
+    |L.ValueKind.ConstantPointerNull -> "const ptr null"
+    |L.ValueKind.NullValue -> "null value"
+    |L.ValueKind.ConstantInt -> "const int"
+    |_ -> "altro" in
+  Printf.printf "%s\n" (L.string_of_llvalue n);
+  Printf.printf "%s\n" (s);
+  let t = L.pointer_type bool_t in
+  let s = L.string_of_lltype ( t) in
+  Printf.printf "%s\n" s;*)
   theModule

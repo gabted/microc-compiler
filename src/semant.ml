@@ -13,12 +13,13 @@ type enviroment = typ t * funSignature t
 Used both in variable declaration and function call*)
 let declaration_compatible t1 t2 = match t1, t2 with
     |TypA(_t1, None), TypA(_t2, _) -> _t1=_t2
-    |TypP(_), TypNullP -> true
+    |TypP _, TypNullP -> true
     |_ -> t1 = t2 
 
 let call_compatible t1 t2 = match t1, t2 with
     |TypA(_t1, _), TypA(_t2, _) -> _t1=_t2
     |TypP(_), TypNullP -> true
+    |TypNullP, TypP _ -> true
     |_ -> t1 = t2 
 
 let binopTypeConversions op t1 t2 loc = 
@@ -28,7 +29,8 @@ let binopTypeConversions op t1 t2 loc =
     |(Equal|Neq), TypC, TypC
     |(Less|Leq|Greater|Geq), TypI, TypI   -> TypB
     |(And|Or), TypB, TypB                  -> TypB
-    |Equal, TypP _, TypNullP -> TypB
+    |(Equal|Neq), TypP _, TypNullP -> TypB
+    |(Equal|Neq), TypNullP, TypP _ -> TypB
     |_ -> Util.raise_semantic_error loc 
       "Incorrect operand types"
 
@@ -115,7 +117,7 @@ let checkVarType loc t =
   |TypV -> 
       Util.raise_semantic_error loc "Variables cannot be void"
   |TypA(_, Some n) when n<1 -> 
-      Util.raise_semantic_error loc "Arrays must have size at least 1"
+      Util.raise_semantic_error loc "Sized Arrays must have size at least 1"
   |_ -> ()
 
 let addVar loc (env:enviroment) (t, id, v)  = 
@@ -207,6 +209,21 @@ let checkFun loc env {typ; fname; formals; body}=
         |TypA _ -> Util.raise_semantic_error loc "Invalid return type"
         |_ -> ()
     in  checkReturnT typ;
+    let checkMultiArrayT =
+      (*return true if all the nested array types are sized*)
+      let rec checkAllSized = function 
+      |TypA(_, None) -> false
+      |TypA(t, Some _) -> checkAllSized t
+      |_ -> true in
+      (*return true if all the nested array types,
+         minus the first one, are sized*)
+      if List.for_all ( function
+          |TypA((TypA _ as t2), _) -> checkAllSized t2
+          |_ -> true
+        ) (List.map fst formals) 
+      then ()
+      else Util.raise_semantic_error loc "Multidimensional array must specify inner sizes"
+    in checkMultiArrayT ;
     let formalsEnv =  
       let initialEnv = (begin_block varT, begin_block funT) in
       let addFormal env (t, id) = addVar loc env (t, id, None) in
