@@ -49,8 +49,19 @@ let declareFun {typ; fname; formals; body;} =
   let funT = L.function_type returnT formalsT in
   L.define_function fname funT theModule 
 
-let declareGlobalVar {loc; node=(t, id, _)} = 
-  let init =  L.const_null (ltype_of_typ t) in
+let declareGlobalVar {loc; node=(t, id, v)} = 
+  let init =  match v with
+    |None -> L.const_null (ltype_of_typ t) 
+    |Some {loc; node=n} -> (match n with
+      | ILiteral n       -> L.const_int int_t n     
+      | CLiteral c       -> L.const_int char_t (Char.code c) 
+      | BLiteral b       -> L.const_int bool_t (Bool.to_int b)   
+      | SLiteral s       -> L.const_stringz theContext s
+      | Addr {loc; node=AccVar i} ->
+          L.lookup_global i theModule |> Option.get
+      |_                 -> failwith "non constant global value inizializer" 
+    ) 
+  in
   L.define_global id init theModule
 
 
