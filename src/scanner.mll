@@ -31,34 +31,44 @@
 (*definitions*)
 let digit = ['0' - '9']
 let id = ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']*
+(*\0 is not and escape sequence in OCaml, so it must be scanned separately*)
 let ES = '\\'['n' 'r' 't' '\\' '\'' '\"']
 
 (*rules*)
 rule token = parse
+    (*----------numbers---------------*)
     digit+ as inum         { let _num = int_of_string_opt inum in
                                 match _num with
                                 |Some(num) -> LINT(num)
                                 |None -> Util.raise_lexer_error lexbuf 
                                         (Lexing.lexeme lexbuf ^": Invalid int format")
                             }
-    |digit*'.'digit+ as dnum  {let _num = float_of_string_opt dnum in
+    (*Ocaml's "float" type is a 64-bit floating point number,
+      so it is natural to compile it in a "double" MicroC type*)
+    (*scientific notation is not implemented*)
+    |(digit+'.'|digit*'.'digit+) as dnum  {let _num = float_of_string_opt dnum in
                                 match _num with
                                 |Some(num) -> LDOUBLE(num)
                                 |None -> Util.raise_lexer_error lexbuf 
                                         (Lexing.lexeme lexbuf ^": Invalid double format")
                             }
-    |"\'\\0\'"                 {LCHAR('\x00')}
-    |'\''(ES|['a'-'z' 'A'-'Z' '0' - '9'] as s)'\''    
+    (*--------chars and strings--------*)
+    |'\''(ES|[^ '\\' '\n' '\"' '\''] as s)'\''    
                              {let _s = Scanf.unescaped s in
                               let c = _s.[0] in
                                 LCHAR(c)
                             }
+    (*"\0" is unescaped manually*)
+    |"\'\\0\'"                 {LCHAR('\x00')}
+    (*Strings are parsed in a separate lexer rule*)
     |'\"'                    {string_parser (Seq.empty) lexbuf}
-    | id as word            {try
+    (*----ids and keywords------------*)
+    | id as word             {try
                                 Hashtbl.find keyword_table word
-                            with 
-                                Not_found ->    ID(word)
-                            }
+                              with 
+                                Not_found ->ID(word)
+                             }
+    (*---unary and binary operators---*)
     | '&'                    { REF }
     | '+'                    { PLUS }
     | '-'                    { MINUS }
@@ -81,22 +91,28 @@ rule token = parse
     | ">="                   { GEQ }
     | "&&"                   { AND }
     | "||"                   { OR }
-    | '!'                   { NOT }
+    | '!'                    { NOT }
+    (*-------brackets and delimiters----*)
     | '('                    { LPAREN }
     | ')'                    { RPAREN }
     | '{'                    { LBRACE}
     | '}'                    { RBRACE }
     | '['                    { LBRACKET }
     | ']'                    { RBRACKET }
-    | ','                    {COMMA}
+    | ','                    { COMMA }
     | ';'                    { SEMI }
     | eof                    { EOF }
+    (*----ignoring whitespaces, newlines and comments------*)
     | [' ' '\t']             { token lexbuf }
     | '\n'                   { Lexing.new_line lexbuf; token lexbuf }
     | "//"[^ '\n']*'\n'{ Lexing.new_line lexbuf; token lexbuf }
     | "/*"                   {multi_comment lexbuf;}
     | _ as c           { Util.raise_lexer_error lexbuf ("Illegal character " ^ (String.make 1 c)) }
 
+
+(* a string is parsed via an accumulator, "sequence",
+ in which are stored the unescaped characters as they are parsed,
+ and it is finally converted into a string when '\"' is recognized *)
 and string_parser sequence = parse
     |'\"'                                     
         {let s = String.of_seq sequence in
@@ -119,8 +135,6 @@ and string_parser sequence = parse
         {Util.raise_lexer_error lexbuf ("Non terminated string")}
     |_ as c 
         {Util.raise_lexer_error lexbuf ("Illegal character while parsing string: " ^(String.make 1 c))}
-
-
 
 and multi_comment = parse
      "*/"                     { token lexbuf }

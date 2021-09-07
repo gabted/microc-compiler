@@ -160,7 +160,6 @@ let rec buildExpr env builder {loc; node;} =
       buildBinOp env builder op v1 v2
   | Call(id, args)       -> 
       buildCall env builder id args
-      
 and buildAcc env builder {loc; node} =
   match node with
     |AccVar id -> 
@@ -243,7 +242,8 @@ and buildDoubleBinOp env builder op v1 v2 =
 let allocLocalVar env builder {loc; node=(t, id, v)} = 
   match v with
   |None -> 
-    L.build_alloca (ltype_of_typ t) id builder
+    let address = L.build_alloca (ltype_of_typ t) id builder in
+    add_entry id address env
   |Some e ->
     let value = buildExpr env builder e in
     let value = castIfNull value (ltype_of_typ t) builder in
@@ -253,7 +253,7 @@ let allocLocalVar env builder {loc; node=(t, id, v)} =
     is a compatible value with t*)
     let address = L.build_alloca value_t id builder in
     let _ = L.build_store value address builder in
-    address
+    add_entry id address env
 
 
 let ifNoTerminator buildTerminator builder=
@@ -324,9 +324,7 @@ and buildBlock env builder l =
     List.fold_left (
       fun env n -> match n.node with
       |Localdec d -> 
-          let {loc; node=(t, id, c)} = d in
-          let address = allocLocalVar env builder d in
-            add_entry id address env
+          allocLocalVar env builder d    
       |Stmt s     -> 
           buildStmt env builder s; env
     ) blockEnv l 
@@ -356,15 +354,4 @@ let to_ir (Prog(topdecls)) : L.llmodule =
     |Globaldec d    ->  declareGlobalVar d |> ignore
     |Fundecl f      ->  buildFunction f
   ) topdecls;
-  (*let n = L.const_pointer_null int_t in
-  let s = match L.classify_value n with
-    |L.ValueKind.ConstantPointerNull -> "const ptr null"
-    |L.ValueKind.NullValue -> "null value"
-    |L.ValueKind.ConstantInt -> "const int"
-    |_ -> "altro" in
-  Printf.printf "%s\n" (L.string_of_llvalue n);
-  Printf.printf "%s\n" (s);
-  let t = L.pointer_type bool_t in
-  let s = L.string_of_lltype ( t) in
-  Printf.printf "%s\n" s;*)
   theModule
