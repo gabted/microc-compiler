@@ -305,8 +305,7 @@ let allocParam builder env (t, id) v =
 
 (*------------------BUILD FUNCTIONS---------------------------*)
 (*Utility function: if no terminator is present,
-  it calls buildTerminator function to build one
-
+  it calls buildTerminator function to build one.
   typical use: 
   ifNoTerminator 
       (L.build_br guardBlock) builder;
